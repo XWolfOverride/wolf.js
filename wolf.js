@@ -667,6 +667,8 @@ var wolf = (() => {
                         if (!ptmpl.controller || ptmpl.fragmentedController) {
                             ptmpl.controller = template.controller;
                             ptmpl.fragmentedController = true;
+                        } else {
+                            console.warn("wolf: Can't install fragment controller on parent element because already have one");
                         }
                         if (template.controller && template.controller.init) {
                             template.controller.init(parentElement);
