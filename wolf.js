@@ -208,10 +208,88 @@ var wolf = (() => {
             }
         }
 
+        /**
+         * MultiPromise is a Promise with multiple lock ids, thenonly fired when all locks has been filled.
+         * @param {*} [data] Object with additional information to pass to the then section.
+         */
+        function MultiPromise(data) {
+            var locks = {};
+            var cbDone;
+
+            /**
+             * Checks the locks and fires the then in case of resolution
+             */
+            function check() {
+                if (!locks)
+                    return; //already resolved (ok or rejected)
+                for (var k in locks)
+                    if (!locks[k])
+                        return; //not finised
+                var result = locks;
+                locks = null; //mark as done
+                cbDone(result);
+            }
+
+            /**
+             * Merge data into the multipromise additional data
+             * @param {*} obj object to merge with additional data
+             */
+            function merge(obj) {
+                data = data || {};
+                data.merge(obj);
+                return this;
+            };
+
+            /**
+             * Adds a new lock to the Multipromise and executes the resolver function
+             * @param {string} id Id of lock
+             * @param {function} resolver Resolver function
+             */
+            function lock(id, resolver) {
+                locks[id] = null;
+                function resolve(value) {
+                    locks[id] = {
+                        ok: true,
+                        value: value
+                    };
+                    check();
+                }
+                function reject(reason) {
+                    locks[id] = {
+                        ok: false,
+                        reason: reason,
+                    }
+                    check();
+                }
+                setTimeout(() => {
+                    try {
+                        resolver(resolve, reject);
+                    } catch (err) {
+                        reject(err);
+                    }
+                });
+                return this;
+            }
+
+            /**
+             * Installs the callbacks to execute on resolution.
+             * @param {function} cbFinish Function to execute when all locks has been resolved.
+             */
+            function then(cbFinish) {
+                cbDone = cbFinish;
+                return this;
+            }
+
+            this.merge = merge;
+            this.lock = lock;
+            this.then = then;
+        }
+
         return {
             require: require,
             CallbackList: CallbackList,
             LoadHandler: LoadHandler,
+            MultiPromise: MultiPromise,
         }
     })();
 
@@ -1451,6 +1529,7 @@ var wolf = (() => {
         wolfExtension: wolfExtension,
         CallbackList: K.CallbackList,
         LoadHandler: K.LoadHandler,
+        MultiPromise: K.MultiPromise,
         // Data
         getProperty: D.getProperty,
         setProperty: D.setProperty,
