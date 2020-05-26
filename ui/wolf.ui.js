@@ -19,8 +19,7 @@
  *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-function wolfUI() {
-
+(() => {
     wolf.wolfExtension((K, D, UI, TOOLS) => {
         var dlgctrl = {
             cnt: 0,
@@ -139,4 +138,4 @@ function wolfUI() {
         });
 
     });
-}
+})();
