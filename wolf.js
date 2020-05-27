@@ -975,7 +975,9 @@ var wolf = (() => {
                 if (path && path[0] == '/')
                     return path;
                 var base;
-                if (template.type != "#app") {
+                if (template.type == "#app" || (contextPath && contextPath[0] == "/"))
+                    base = contextPath;
+                else {
                     base = element.getParent().getContextPath();
                     if (!base)
                         base = contextPath;
@@ -985,8 +987,7 @@ var wolf = (() => {
                         if (contextPath)
                             base = base + contextPath;
                     }
-                } else
-                    base = contextPath;
+                }
                 if (!base)
                     return path;
                 if (path) {
