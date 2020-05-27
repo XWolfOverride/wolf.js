@@ -1330,6 +1330,7 @@ var wolf = (() => {
                     }
                 })();
             }
+
             if (!element.getController)
                 throw Error("Only valid for elements inside wolf context");
 
@@ -1343,23 +1344,28 @@ var wolf = (() => {
                 if (!navEntry)
                     return;
 
-                document.location.hash = navEntry.pattern;
-
                 var lh = new K.LoadHandler(() => {
                     if (navEntry.event) {
-                        var ctrl = element.getController();
-                        if (ctrl[navEntry.event])
-                            ctrl[navEntry.event](id, data);
+                        var eventName = navEntry.event;
+                        var ctrl;
+                        if (eventName[0] == '/') {
+                            eventName = eventName.substr(1);
+                            ctrl = lh.__elem.getApplicationController();
+                        } else
+                            ctrl = lh.__elem.getController();
+                        if (ctrl[eventName])
+                            ctrl[eventName](lh.__elem, id, data);
                     }
                 });
 
                 if (navEntry.set) {
                     for (var k in navEntry.set) {
                         var dest = navEntry.set[k];
-                        var elem = document.getElementById(k);
+                        var elem = element.byId(k);
                         if (elem) {
                             lh.enter();
-                            loadFragmentTo(dest, elem, () => {
+                            loadFragmentTo(dest, elem, (templ, setElem) => {
+                                lh.__elem = setElem;
                                 lh.leave();
                             });
                         }
@@ -1377,7 +1383,16 @@ var wolf = (() => {
                 if (!navEntry)
                     return;
 
-                document.location.hash = navEntry.pattern; //TODO: Process data and complex patterns
+                var pattern = "";
+                data = data || {};
+                if (navEntry.pattern)
+                    navEntry.pattern.forEach(part => {
+                        var patternPart = part.isData ? data[part.name] : part.name;
+                        pattern += "/" + (patternPart || "");
+                    });
+                if (pattern)
+                    pattern = pattern.substr(1);
+                document.location.hash = pattern;
             }
 
             /**
@@ -1385,16 +1400,73 @@ var wolf = (() => {
              * @param {string} hash 
              */
             function processHash(hash) {
-                if (!hash)
-                    hash = "";
-                if (hash.length > 0 && hash[0] == '#')
+                if (hash && hash[0] == '#')
                     hash = hash.substr(1);
-                // hash = hash.split('/'); TODO: Process data and complex patterns
+                if (hash) {
+                    hash = hash.split('/');
+                    var candidates = []; //Navigation ids
+                    var navId;
+                    //First step get all candidates
+                    for (var k in navigationMap)
+                        candidates.push(k);
+                    // Filter candidates
+                    for (var i in hash) {
+                        var hpart = hash[i];
+                        var newCa = [];
+                        var newCaVar = [];
+                        var exact = false;
+                        candidates.forEach(k => {
+                            if (!k)
+                                return; //Kill nulls
+                            var nav = navigationMap[k];
+                            if (!nav.pattern || nav.pattern.length <= i)
+                                return;
+                            if (nav.pattern[i].name == hpart && !nav.pattern[i].isData) {
+                                //A exact match (no varialbe) has been found and have preference. 
+                                exact = true;
+                                newCa.push(k);
+                            } else
+                                if (!exact && nav.pattern[i].isData)
+                                    newCaVar.push(k);
+                        });
+                        if (!exact) //No exact match, allow variable ones
+                            newCa = newCa.concat(newCaVar)
+                        if (newCa.length == 1) {
+                            navId = newCa[0];
+                            break;
+                        } else if (newCa.length == 0) {
+                            navId = candidates[0];
+                            break;
+                        } else
+                            candidates = newCa;
+                    }
+                    if (!navId)
+                        navId = candidates[0];
+                    // Candidate already defined, process it
+                    if (navId) {
+                        var data = {};
+                        var nav = navigationMap[navId];
+                        if (nav.pattern)
+                            for (var i in hash)
+                                if (i < nav.pattern.length && nav.pattern[i].isData)
+                                    data[nav.pattern[i].name] = hash[i];
+                        doNav(navId, data);
+                        return;
+                    }
+                } else
+                    for (var k in navigationMap) {
+                        var navEntry = navigationMap[k];
+                        if (navEntry.pattern == null) {
+                            doNav(k);
+                            return;
+                        }
+                    }
                 for (var k in navigationMap) {
-                    var navEntry = navigationMap[k];
-                    if (navEntry.pattern == hash)
-                        doNav(k);
+                    console.warn("No matching navigation found, navigating to first");
+                    doNav(k);
+                    return;
                 }
+                throw new Error("Hash does not have any matching navigation");
             }
 
             var nav = element.navigator = {
@@ -1405,23 +1477,43 @@ var wolf = (() => {
             navigatorController.registerNavigator(element, nav);
 
             /**
-             * navigation creation commiter
-             * @param {function} cb 
+             * Navigation initialization and data processing
              */
-            function initNavigation(cb) {
+            function initNavigation() {
+                for (var k in navigationMap) {
+                    var navi = navigationMap[k];
+                    if (navi.pattern) {
+                        var path = navi.pattern.split('/');
+                        for (var i in path) {
+                            var ref = path[i];
+                            if (!ref)
+                                continue;
+                            path[i] = ref = {
+                                name: ref
+                            }
+                            if (ref.name[0] == '{') {
+                                ref.name = ref.name.substr(1, ref.name.length - 2);
+                                ref.isData = true;
+                            }
+                        }
+                        navi.pattern = path;
+                    } else
+                        navi.pattern = null;
+                }
+
                 nav.processHash(document.location.hash);
-                cb && cb(nav);
+                callback && callback(nav);
             }
 
             if (typeof (navigationMap) === 'string') {
                 TOOLS.loadJSON(navigationMap, data => {
                     navigationMap = data;
-                    initNavigation(callback);
+                    initNavigation();
                 }, e => {
-                    throw new Error("Can't load the navigation map at: " + navigationMap);
+                    throw new Error("Can't load the navigation map at: " + navigationMap + "\n(" + e + ")");
                 });
             } else {
-                initNavigation(callback);
+                initNavigation();
             }
             return nav;
         }
