@@ -296,7 +296,7 @@ var wolf = (() => {
     // ==== Data === data model and binding
     var D = (() => {
         var processors = {};
-        var model = new Model();
+        var model = { "": new Model() };
 
         /**
          * Navigate object properties and sub-objects based on path string separated by '/'.
@@ -413,9 +413,17 @@ var wolf = (() => {
 
         /**
          * Return the current model
+         * 
+         * @param {sring} [id] id of model to get, if null or "" the default model will be fetched
          */
-        function getModel() {
-            return model;
+        function getModel(id) {
+            if (!id)
+                id = "";
+            return model[id];
+        }
+
+        function setModel(id, model) {
+            return model[id] = model;
         }
 
         /**
@@ -514,7 +522,7 @@ var wolf = (() => {
         }
 
         /**
-         * Creates a data binding, a binding begins with '{' and ends with '}'
+         * Creates a data binding, a binding contains multiple binding blocks starting with '{' and ending with '}'
          * @param {string} path path of binding
          */
         function Binding(path) {
@@ -550,6 +558,7 @@ var wolf = (() => {
                 return bindingParts;
             }
             var parts = parseBinding(path);
+            var mdl = model[""];
 
             /**
              * Executes the binding and return the value 
@@ -564,7 +573,7 @@ var wolf = (() => {
                     var part = parts[i];
                     var v;
                     if (part.bind) {
-                        v = model.getProperty(contextPath(part.path), context);
+                        v = mdl.getProperty(contextPath(part.path), context);
                     } else
                         v = part.value;
                     if (value === undefined)
@@ -593,9 +602,9 @@ var wolf = (() => {
                             var path = part.path.substr(0, processoridx);
                             while (path && path[path.length - 1] == "/")
                                 path = path.substr(0, path.length - 1);
-                            model.registerBindingExecutor(path, bexec);
+                            mdl.registerBindingExecutor(path, bexec);
                         } else
-                            model.registerBindingExecutor(part.path, bexec);
+                            mdl.registerBindingExecutor(part.path, bexec);
                     }
                 }
                 bexec.write();
@@ -687,6 +696,7 @@ var wolf = (() => {
             setProperty: setProperty,
             registerDataProcessor: registerDataProcessor,
             getModel: getModel,
+            setModel: setModel,
             Binding: Binding,
         };
     })()
