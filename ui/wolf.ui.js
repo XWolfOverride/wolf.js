@@ -26,6 +26,11 @@
             modaling: false
         }
 
+        // ====================
+        // ====================
+        // ==            Public
+        // ====================
+
         /**
          * Shows a non blocking message to the user
          * @param {string} text Text to show
@@ -46,11 +51,11 @@
 
         /**
          * Show a dialog embedding a fragment.
-         * @param {string} url url of the fragment
-         * @param {element} element destination element, application element recommended
-         * @param {boolean} modal true to show the dialog in modal way
-         * @param {*} [controller] controller for the dialogs events, if none the parent element one will be used
-         * @param {function} [callback] callback when the dialog is shown
+         * @param {string} url Url of the fragment
+         * @param {element} element Destination element, application element recommended
+         * @param {boolean} modal True to show the dialog in modal way
+         * @param {*} [controller] Controller for the dialogs events, if none the parent element one will be used
+         * @param {function} [callback] Callback when the dialog is shown
          */
         function dialog(url, element, modal, controller, callback) {
             var modalWall, dialogFrame, modaling;
@@ -76,12 +81,11 @@
         /**
          * Show a dialog asking or showing information.
          * @param {string} text Text to show
-         * @param {*} buttons 
-         * @param {element} element 
-         * @param {element} element destination element, application element recommended
-         * @param {boolean} modal true to show the dialog in modal way
-         * @param {*} [controller] controller for the dialogs events, if none the parent element one will be used
-         * @param {function} [callback] callback when the dialog is shown
+         * @param {*} buttons Button definition
+         * @param {element} element Destination element, application element recommended
+         * @param {boolean} modal True to show the dialog in modal way
+         * @param {*} [controller] Controller for the dialogs events, if none the parent element one will be used
+         * @param {function} [callback] Callback when the dialog is shown
          */
         function messageDialog(text, buttons, element, modal, controller, callback) {
             var modalWall, dialogFrame, modaling;
@@ -103,7 +107,7 @@
 
             controller = controller || {};
             var bts = [];
-            buttons = buttons || { doOk: "Ok" };// Degault ok button
+            buttons = buttons || { doOk: "Ok" };// Default ok button
 
             for (bt in buttons) {
                 var btext = buttons[bt];
