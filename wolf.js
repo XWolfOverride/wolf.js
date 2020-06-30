@@ -327,9 +327,17 @@ var wolf = (() => {
                     continue; // "" return same object "////" is the same object too and this is good
                 if (part[0] == '^') { //Apply processor
                     var procName = part.substr(1);
+                    var procPars = null;
+                    if (procName.indexOf('(') >= 0) {
+                        if (procName[procName.length - 1] != ')')
+                            throw new Error(`Malformed processor call "${procName}"`);
+                        var pstart = procName.indexOf('(');
+                        procPars = procName.substring(pstart + 1, procName.length - 1);
+                        procName = procName.substring(0, pstart);
+                    }
                     var fmt = processors[procName];
                     if (fmt)
-                        pdata = fmt(pdata, context);
+                        pdata = fmt(pdata, { pars: procPars }.merge(context));
                     else
                         throw new Error("Processor '" + procName + "' not found.");
                 } else
