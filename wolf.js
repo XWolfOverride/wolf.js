@@ -510,6 +510,7 @@ var wolf = (() => {
             this.refresh = refreshModelPath;
             this.refreshElement = refreshModelElement;
             this.registerBindingExecutor = registerBindingExecutor;
+            this.getBindings = () => { return bindings; };
         }
 
         /**
@@ -653,11 +654,10 @@ var wolf = (() => {
                     pathbar += '/';
                 //v0.1 delete all and refill
                 function populate(data) {
-                    repeatItems.forEach(item => parent.removeChild(item));
+                    repeatItems.forEach(item => { try { parent.removeChild(item) } catch{ } });
                     repeatItems = []
-
-                    if (!data || !data.forEach)
-                        return; // Not an array binded
+                    if (!data)
+                        return;
                     for (var k in data) {
                         templates.forEach(templ => {
                             var elements = UI.instanceTemplate(templ, { parent: parent, contextPath: pathbar + k });
@@ -1343,7 +1343,7 @@ var wolf = (() => {
             function doNav(id, data) {
                 var navEntry = navigationMap[id];
                 if (!navEntry)
-                    return;
+                    throw new Error(`Navigation "${id}" not defined.`)
 
                 var lh = new K.LoadHandler(() => {
                     if (navEntry.event) {
@@ -1382,7 +1382,7 @@ var wolf = (() => {
             function navTo(id, data) {
                 var navEntry = navigationMap[id];
                 if (!navEntry)
-                    return;
+                    throw new Error(`Navigation "${id}" not defined.`)
 
                 var pattern = "";
                 data = data || {};
@@ -1601,10 +1601,89 @@ var wolf = (() => {
             fetcher(url, "json", callback, callfail);
         }
 
+        /**
+         * i18n handling class
+         * @param {string} path Base file path of i18n property files, this sould point to the name of the root file without the .json
+         * @param {string} [lang] Language code of i18n (optional, by default navigator language)
+         */
+        function I18N(path, lang) {
+            var langTree = [];
+
+            /**
+             * Sets the current language code and fetch the language data
+             * @param {string} code Language code in format xx-XX
+             */
+            function setLang(code) {
+                var langsteps = code.split("-");
+                lang = {
+                    lang: langsteps.length > 0 ? langsteps[0].toLowerCase() : "",
+                    country: langsteps.length > 1 ? langsteps[1].toUpperCase() : "",
+                    code: code,
+                }
+                if (!langTree[0])
+                    loadJSON(path + ".json", l => langTree[0] = l);
+                if (lang.lang)
+                    loadJSON(path + `-${lang.lang}.json`, l => langTree[1] = l, () => langTree[1] = {});
+                else
+                    langTree[1] = {};
+                if (lang.country)
+                    loadJSON(path + `-${lang.lang}-${lang.country}.json`, l => langTree[2] = l, () => langTree[2] = {});
+                else
+                    langTree[2] = {};
+            }
+
+            /**
+             * Return the lenguage information
+             */
+            function getLanguage() {
+                return lang;
+            }
+
+            /**
+             * Simple string-value formatter 
+             * @param {string} expression string with the expression
+             * @param {*} valueObj object with all the values to be expressed
+             */
+            function stringTemplateParser(expression, valueObj) {
+                const templateMatcher = /{{\s?([^{}\s]*)\s?}}/g;
+                let text = expression.replace(templateMatcher, (substring, value, index) => {
+                    value = valueObj[value];
+                    if (!value)
+                        value = "";
+                    return value;
+                });
+                return text
+            }
+
+            /**
+             * Return the text of the language file tree
+             * @param {string} key 
+             * @param {*} data 
+             */
+            function getText(key, data) {
+                var l = 2;
+                var txt;
+                while (l >= 0 && !txt)
+                    txt = langTree[l--][key];
+                if (!txt)
+                    return "";
+                return stringTemplateParser(txt, data || {});
+            }
+
+            this.setLang = setLang;
+            this.getLanguage = getLanguage; //Different name due to the behaviour is a slight different too
+            this.getText = getText;
+
+            if (!lang)
+                lang = navigator.language || navigator.userLanguage;
+            setLang(lang);
+        }
+
         return {
             fetch: fetcher,
             wGet: wGet,
             loadJSON: loadJSON,
+            I18N: I18N,
         }
     })()
 
@@ -1635,7 +1714,8 @@ var wolf = (() => {
         import: UI.import,
         createNavigator: UI.createNavigator,
         // Tools
-        wGet: TOOLS.wget,
+        wGet: TOOLS.wGet,
         loadJSON: TOOLS.loadJSON,
+        I18N: TOOLS.I18N,
     };
 })();
