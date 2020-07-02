@@ -1623,29 +1623,40 @@ var wolf = (() => {
          * i18n handling class
          * @param {string} path Base file path of i18n property files, this sould point to the name of the root file without the .json
          * @param {string} [lang] Language code of i18n (optional, by default navigator language)
+         * @param {function} cb Callback to execute when lang tree has been chagned and loaded
          */
-        function I18N(path, lang) {
-            var langTree = [];
+        function I18N(path, lang, gcb) {
+            const empty = {};
+            var langTree = [empty, empty, empty];
 
             /**
              * Sets the current language code and fetch the language data
              * @param {string} code Language code in format xx-XX
+             * @param {function} cb Callback to execute when lang tree has been loaded
              */
-            function setLang(code) {
+            function setLang(code, cb) {
                 var langsteps = code.split("-");
+                var langdone = [, ,];
                 lang = {
                     lang: langsteps.length > 0 ? langsteps[0].toLowerCase() : "",
                     country: langsteps.length > 1 ? langsteps[1].toUpperCase() : "",
                     code: code,
                 }
-                if (!langTree[0])
-                    loadJSON(path + ".json", l => langTree[0] = l);
+                function set(i, l) {
+                    langTree[i] = l || empty;
+                    langdone[i] = true;
+                    cb = cb || gcb;
+                    if (langdone[0] && langdone[1] && langdone[2])
+                        cb && cb(code);
+                }
+                if (langTree[0] == empty)
+                    loadJSON(path + ".json", l => set(0, l));
                 if (lang.lang)
-                    loadJSON(path + `-${lang.lang}.json`, l => langTree[1] = l, () => langTree[1] = {});
+                    loadJSON(path + `-${lang.lang}.json`, l => set(1, l), () => set(1));
                 else
                     langTree[1] = {};
                 if (lang.country)
-                    loadJSON(path + `-${lang.lang}-${lang.country}.json`, l => langTree[2] = l, () => langTree[2] = {});
+                    loadJSON(path + `-${lang.lang}-${lang.country}.json`, l => set(2, l), () => set(2));
                 else
                     langTree[2] = {};
             }
