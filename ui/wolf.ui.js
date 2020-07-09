@@ -125,7 +125,7 @@
 
             var dlg = UI.instanceTemplate({
                 type: "div", controller: controller, a: { "class": "wolf-dialog-message-body" }, w: {}, c: [
-                    { type: "", value: text },
+                    { type: "div", a: { "class": "wolf-dialog-message-text" }, w: {}, c: [{ type: "", value: text }]},
                     { type: "div", a: { "class": "wolf-dialog-message-buttons" }, w: {}, c: bts }
                 ]
             }, { parent: element })[0];
