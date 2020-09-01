@@ -860,7 +860,7 @@ var wolf = (() => {
                 "context": {
                     bindable: false,
                     processor: function (element, value, template) {
-                        element.setContext(value);
+                        element.setContextPath(value);
                     }
                 }
             }
