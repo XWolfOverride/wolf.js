@@ -1322,6 +1322,8 @@ var wolf = (() => {
          * @param {function} callback callback when navigation is ready or when naivgation event occurs
          */
         function createNavigator(element, navigationMap, callback) {
+            var current;
+
             if (!navigatorController) {
                 //Create navigation controller object
                 navigatorController = (() => {
@@ -1362,7 +1364,7 @@ var wolf = (() => {
                 var navEntry = navigationMap[id];
                 if (!navEntry)
                     throw new Error(`Navigation "${id}" not defined.`)
-
+                current = { id: id, data: data };
                 var lh = new K.LoadHandler(() => {
                     if (navEntry.event) {
                         var eventName = navEntry.event;
@@ -1488,9 +1490,19 @@ var wolf = (() => {
                 throw new Error("Hash does not have any matching navigation");
             }
 
+            /**
+             * Return information about the actually navigation stage
+             */
+            function getCurrentNavigation() {
+                if (!current)
+                    current = {};
+                return { id: current.id, data: current.data }
+            }
+
             var nav = element.navigator = {
                 navTo: navTo,
                 processHash: processHash,
+                getCurrentNavigation: getCurrentNavigation,
             }
 
             navigatorController.registerNavigator(element, nav);
