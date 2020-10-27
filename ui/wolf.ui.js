@@ -134,12 +134,34 @@
             callback && callback(dialogFrame, element);
         }
 
+        /**
+         * Show a dialog asking or showing information.
+         * @param {*} ui UI definition
+         * @param {*} buttons Button definition
+         * @param {element} element Destination element, application element recommended
+         * @param {boolean} modal True to show the dialog in modal way
+         * @param {*} [controller] Controller for the dialogs events, if none the parent element one will be used
+         * @param {function} [callback] Callback when the dialog is shown
+         */
+        function uiDialog(ui, buttons, element, modal, controller, callback) {
+
+        }
+
+        // ====================
+        // ====================
+        // ==           Private
+        // ====================
+
+        // ====================
+        // ====================
+        // ==         Injection
+        // ====================
         wolf.merge({
             // UI
             toast: toast,
             dialog: dialog,
             messageDialog: messageDialog,
+            uiDialog: uiDialog,
         });
-
     });
 })();

@@ -1,0 +1,24 @@
+<!-- Sample for now !! -->
+<wolf:define name="button">
+    <script>
+        define({
+            click: {
+                type: "event",
+                bindable: false,
+                set: attribute => {
+                    button.addEventListener("click", event => {
+
+                    })
+                }
+            },
+            icon: {
+                bindable: true,
+                bindTo: "icon"
+            }
+        })
+    </script>
+    <button wolf:id="button" class="icon"><i class="material-icons">{icon}</i></button>
+</wolf:define>
+
+<!-- usage -->
+<wolf:button click="goAdd" icon="add" />
