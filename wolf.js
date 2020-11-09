@@ -812,6 +812,7 @@ var wolf = (() => {
                 },
                 items: {
                     bindable: true,
+                    mandatory: true
                 }
             }
         }
@@ -1126,7 +1127,7 @@ var wolf = (() => {
             }, initiators = [];
 
             function valOrBinding(val) {
-                if (typeof (val) === "string" && val.indexOf('{') >= 0)
+                if (typeof (val) === "string" && val.length < 512 && val.indexOf('{') >= 0 && val.indexOf("'use strict';") < 0 && val.indexOf('"use strict";') < 0)
                     return new D.Binding(val);
                 return val;
             }
@@ -1160,6 +1161,12 @@ var wolf = (() => {
                             throw new Error(templ.type + " attribute " + attr + " can not be binded");
                         templ.w[attr] = aval;
                     });
+                    for (var k in wdef) {
+                        if (k == "init" || k == "postInit" || k == "ctor")
+                            continue;
+                        if (wdef[k].mandatory && !templ.w[k])
+                            throw new Error(templ.type + " attribute " + k + " is mandatory");
+                    }
                     wdef.init && wdef.init(templ);
                 } else {
                     var attrs = node.getAttributeNames();
