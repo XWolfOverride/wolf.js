@@ -125,7 +125,7 @@
 
             var dlg = UI.instanceTemplate({
                 type: "div", controller: controller, a: { "class": "wolf-dialog-message-body" }, w: {}, c: [
-                    { type: "div", a: { "class": "wolf-dialog-message-text" }, w: {}, c: [{ type: "", value: text }]},
+                    { type: "div", a: { "class": "wolf-dialog-message-text" }, w: {}, c: [{ type: "", value: text }] },
                     { type: "div", a: { "class": "wolf-dialog-message-buttons" }, w: {}, c: bts }
                 ]
             }, { parent: element })[0];
@@ -147,21 +147,51 @@
 
         }
 
+        /**
+         * Loads and initializes a UI library
+         * @param {string} path Path of the UI library to load
+         */
+        function loadLibrary(path) {
+            UI.fetchFragment(path, dom => {
+                UI.readTemplate(dom, (fragment) => {
+                });
+            });
+        }
+
         // ====================
         // ====================
         // ==           Private
         // ====================
 
+        /**
+         * Create the base element needed for the extensible UI and control building system
+         */
+        function InitExtensibleUI() {
+            UI.registerElement("control", {
+                init: template => {
+                },
+                postInit: template => {
+                    
+                },
+                ctor: (template, ext) => {
+                },
+                id: { bindable: false },
+                childs: { bindable: false }
+            });
+        }
+
         // ====================
         // ====================
         // ==         Injection
         // ====================
+        InitExtensibleUI();
         wolf.merge({
             // UI
             toast: toast,
             dialog: dialog,
             messageDialog: messageDialog,
             uiDialog: uiDialog,
+            loadLibrary: loadLibrary,
         });
     });
 })();

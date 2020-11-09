@@ -671,7 +671,7 @@ var wolf = (() => {
                     pathbar += '/';
                 //v0.1 delete all and refill
                 function populate(data) {
-                    repeatItems.forEach(item => { try { parent.removeChild(item) } catch{ } });
+                    repeatItems.forEach(item => { try { parent.removeChild(item) } catch { } });
                     repeatItems = []
                     if (!data)
                         return;
@@ -1093,8 +1093,10 @@ var wolf = (() => {
                 else
                     tnode.nodeValue = template.value;
                 return [tnode];
-            } else if (template.type.substr(0, 5) == "wolf:") {
-                return wolfElements[template.type.substr(5)].ctor(template, ext);
+                // } else if (template.type.substr(0, 5) == "wolf:") {
+                //     return wolfElements[template.type.substr(5)].ctor(template, ext);
+            } else if (template.we) {
+                return template.we.ctor(template, ext);
             } else {
                 var node = document.createElement(template.type);
                 processElement(node, template, ext);
@@ -1140,12 +1142,14 @@ var wolf = (() => {
             } else {
                 templ.type = node.tagName.toLowerCase();
                 if (templ.type.substr(0, 5) == "wolf:") {// Wolf element!
-                    var wdef = wolfElements[templ.type.substr(5)];
+                    var wdef = templ.we = wolfElements[templ.type.substr(5)];
                     if (!wdef)
                         throw new Error("Unknown element: " + templ.type);
                     node.getAttributeNames().forEach(attr => {
                         if (attr == "init")
                             throw new Error("init is a reserved attribute");
+                        if (attr == "postInit")
+                            throw new Error("postInit is a reserved attribute");
                         if (attr == "ctor")
                             throw new Error("ctor is a reserved attribute");
                         var attri = wdef[attr];
@@ -1206,6 +1210,11 @@ var wolf = (() => {
                     //      Better try to parse the HTML manually when reading templates to avoid node relocations
                     templ = init(templ);
                 });
+
+                // PostInit
+                //templ.postInit && templ.postInit();
+                if (templ.we)
+                    templ.we.postInit && templ.we.postInit(templ);
             }
             return templ;
         }
@@ -1229,6 +1238,25 @@ var wolf = (() => {
         }
 
         /**
+         * Fetch the fragment form a url and uses the browser parser to return DOM as wolf:fragment
+         * @param {string} url url of the fragment to load
+         * @param {fetchFragment_callback} [callback] callback to execute when the fragment has been fetched
+         */
+        function fetchFragment(url, callback) {
+            /**
+             * @callback fetchFragment_callback
+             * @param {*} rootElement Loaded fragment DOM
+             */
+            TOOLS.wGet(url, html => {
+                var rootElement = document.createElement("wolf:fragment");
+                rootElement.innerHTML = html;
+                if (rootElement.children.length == 1 && rootElement.children[0].tagName == "WOLF:FRAGMENT")
+                    rootElement = rootElement.children[0];
+                callback(rootElement);
+            });
+        }
+
+        /**
          * Load a fragment from the url and creates the internal fragment template
          * @param {string} url url of the fragment to load
          * @param {loadFragment_callback} [callback] callback to execute when the fragment has been loaded
@@ -1244,11 +1272,7 @@ var wolf = (() => {
                     throw new Error("named fragment '" + url + "' not loaded");
                 var cbl = frgs[url] = new K.CallbackList(); //temporal CBL
                 cbl.add(callback);
-                TOOLS.wGet(url, html => {
-                    var rootElement = document.createElement("wolf:fragment");
-                    rootElement.innerHTML = html;
-                    if (rootElement.children.length == 1 && rootElement.children[0].tagName == "WOLF:FRAGMENT")
-                        rootElement = rootElement.children[0];
+                fetchFragment(url, rootElement => {
                     processFragmentTemplate(rootElement, (fragment) => {
                         cbl.fire([frgs[url] = fragment]);
                     });
@@ -1549,13 +1573,25 @@ var wolf = (() => {
             return nav;
         }
 
+        /**
+         * Creates a wolf:xxxx element, use with caution
+         * @param {string} id Id of the element to register
+         * @param {*} element Object controller of the element
+         */
+        function registerElement(id, element) {
+            wolfElements[id] = element;
+        }
+
         return {
             initApp: initApp,
             instanceTemplate: instanceTemplate,
+            readTemplate: readTemplate,
+            fetchFragment: fetchFragment,
             loadFragment: loadFragment,
             loadFragmentTo: loadFragmentTo,
             import: importResource,
             createNavigator: createNavigator,
+            registerElement: registerElement,
         }
     })();
 
