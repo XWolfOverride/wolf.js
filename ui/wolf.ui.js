@@ -20,6 +20,7 @@
  */
 
 (() => {
+    'use strict';
     wolf.wolfExtension((K, D, UI, TOOLS) => {
         var dlgctrl = {
             cnt: 0,
@@ -153,8 +154,7 @@
          */
         function loadLibrary(path) {
             UI.fetchFragment(path, dom => {
-                UI.readTemplate(dom, (fragment) => {
-                });
+                UI.readTemplate(dom);
             });
         }
 
@@ -171,11 +171,59 @@
                 init: template => {
                 },
                 postInit: template => {
-                    
+                    var id = template.w.id;
+                    var controller = {};
+                    var ui = {};
+                    var ev = {};
+                    var script;
+                    template.c.forEach(c => {
+                        switch (c.type) {
+                            case "attr": {
+                                if (c.c.length != 1 || c.c[0].type)
+                                    throw new Error("Control definition wolf:" + id + " attribute name missing or type error");
+                                var name = c.c[0].value;
+                                if (name == "init" || name == "postInit" || name == "ctor" || name == "ui")
+                                    throw new Error("Control definition wolf:" + id + " attribute '" + name + "' reserved.");
+                                if (controller[name])
+                                    throw new Error("Control definition wolf:" + id + " attribute '" + name + "' already defined.");
+                                var attr = controller[name] = {};
+                                if (c.a.bindable)
+                                    attr.bindable = c.a.bindable == "true";
+                                if (c.a.mandatory)
+                                    attr.mandatory = c.a.mandatory == "true";
+                                break;
+                            }
+                            case "event": {
+                                if (c.c.length != 1 || c.c[0].type)
+                                    throw new Error("Control definition wolf:" + id + " event name missing or type error");
+                                var name = c.c[0].value;
+                                if (ev[name])
+                                    throw new Error("Control definition wolf:" + id + " event '" + name + "' already defined.");
+                                ev[name] = true;
+                                break;
+                            }
+                            case "ui": {
+                                var id = c.a.id || "·";
+                                if (ui[id])
+                                    throw new Error("Control definition wolf:" + id + " ui " + (id == "·" ? "" : "'" + id + "'") + " already defined.");
+                                ui[id] = c.c;
+                                break;
+                            }
+                            case "script": {
+                                script = c.c[0].value;// TODO As script uses { character is processed as binding but it is not a binding, define a way to avoid bindings on scripts (detenct " character too??)
+                                break;
+                            }
+                            default:
+                                throw new Error("Control definition wolf:" + id + " " + c.type + " not allowed here.");
+                        }
+                    });
+                    if (script && (typeof script != "string" || script.indexOf("use strict") < 1))
+                        throw new Error("Control definition wolf:" + id + " script 'use strict'; mandatory");
+                    var loader = new Function();
                 },
                 ctor: (template, ext) => {
                 },
-                id: { bindable: false },
+                id: { bindable: false, mandatory: true },
                 childs: { bindable: false }
             });
         }
