@@ -1094,10 +1094,10 @@ var wolf = (() => {
                 else
                     tnode.nodeValue = template.value;
                 return [tnode];
-                // } else if (template.type.substr(0, 5) == "wolf:") {
-                //     return wolfElements[template.type.substr(5)].ctor(template, ext);
             } else if (template.we) {
                 return template.we.ctor(template, ext);
+            } else if (template.type.substr(0, 5) == "wolf:") {
+                return wolfElements[template.type.substr(5)].ctor(template, ext);
             } else {
                 var node = document.createElement(template.type);
                 processElement(node, template, ext);
