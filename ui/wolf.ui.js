@@ -268,49 +268,24 @@
                     // Controller logics
                     controller.init = script.init;
                     controller.ctor = (template, ext) => {
-                        // WARNING
-                        // WARNING
-                        // WARNING
-                        // WARNING
-                        //  No se puede usar los HOOKS así ya que los ctor de cada elemento se definen en el template, el cual es compartido
-                        //  y no se garantiza que el tiempo de ejecución de los ctor definidios aqui se ejecuten en el momento correspondiente a este ctor del custom cotnrol
-                        //
-                        //  Mirar de definir una estructura de mapeo en el UI.instanceTemplate( que permita acceso rápido a las instancias devueltas por él
-                        //  o escanear todas las instanicas dom para obtener el template de generación y comprobar con el de una lista de hooks pre definida !!!<<<!!!
-                        // WARNING
-                        // WARNING
-                        // WARNING
-                        // WARNING
-                        // Hook UI data
-                        var hooks = {
+                        // Generate data sheet
+                        var values = {};
+                        // -- defaults
+                        for (var k in controller) {
+                            var attr = controller[k];
+                            if (attr && attr.default)
+                                values[k] = attr.default;
                         }
-                        function HookUI(templ) {
-                            if (templ.c)
-                                templ.c.forEach(HookUI);
-                            if (templ.value && templ.value[0] == "$")
-                                templ.ctor = (node) => {
-                                    var hl = hooks[templ.value];
-                                    if (!hl)
-                                        hl = hooks[templ.value] = [];
-                                    hl.push(data => {
-                                        node.nodeValue = data;
-                                    });
-                                }
-                            for (var k in templ.a) {
-                                var attr = templ.a[k];
-                                if (attr && attr[0] == "$")
-                                    templ.ctor = (node) => {
-                                        var hl = hooks[attr];
-                                        if (!hl)
-                                            hl = hooks[attr] = [];
-                                        hl.push(data => {
-                                            node.setAttribute(k, data);
-                                        });
-                                    }
-                            }
+                        // -- user
+                        for (var k in template.w) {
+                            var attr = template.w[k];
+                            if (k.startsWith("event:")) {
+                                //TODO handle events here?
+                            } else
+                                values[k] = attr;
                         }
-                        for (var k in ui)
-                            ui[k].forEach(templ => HookUI(templ));
+
+                        // Generate DOM
                         var tux = script.render();
                         var ux = [];
                         if (!Array.isArray(tux))
@@ -318,23 +293,66 @@
                         for (var i in tux)
                             ux = ux.concat(UI.instanceTemplate(tux[i], ext));
 
-                        for (var k in template.w) {
-                            var attr = template.w[k];
-                            if (k.startsWith("event:")) {
-                                //TODO handle events here
-                            } else
-                                if (attr instanceof D.Binding) {
-                                    attr.bindExecutor(ext.parent,
-                                        null,
-                                        null,
-                                        function (read) {
-                                            var value = read({ element: ext.parent }, "string");
-                                            // Revisar todos los hooks y establecer valor
-                                        });
-                                } else {
-                                    // Revisar todos los hooks y establecer valor
-                                }
+                        // Scan generated nodes and identify insertion hooks
+                        var hooks = {};
+                        function hookAdd(k, n, h) {
+                            if (k && k[0] == "$")
+                                k = k.substr(1);
+                            var hl = hooks[k];
+                            if (!hl)
+                                hl = hooks[k] = [];
+                            if (h.a)
+                                hl.push(data => {
+                                    if (data instanceof D.Binding)
+                                        data.bindExecutor(n,
+                                            null,
+                                            null,
+                                            read => n.setAttribute(h.a, read({ element: n }, "string"))
+                                        );
+                                    else
+                                        n.setAttribute(h.a, data);
+                                });
+                            else
+                                hl.push(data => {
+                                    if (data instanceof D.Binding)
+                                        data.bindExecutor(n,
+                                            null,
+                                            null,
+                                            read => n.nodeValue = read({ element: n }, "string")
+                                        );
+                                    else
+                                        n.nodeValue = data;
+                                });
                         }
+                        function scanDOM(node) {
+                            for (var i = 0; i < node.childNodes.length; i++)
+                                scanDOM(node.childNodes[i]);
+                            var nt = node.getTemplate();
+                            for (var k in prehooks) {
+                                var hooks = prehooks[k];
+                                hooks.forEach(hook => {
+                                    if (hook.t == nt)
+                                        hookAdd(k, node, hook);
+                                });
+                            }
+                        }
+                        ux.forEach(node => scanDOM(node));
+                        function setValue(k, val) {
+                            var hl = hooks[k];
+                            if (!hl)
+                                return;
+                            for (var i in hl)
+                                hl[i](val);
+                        }
+                        // Set defaults
+                        for (var k in controller) {
+                            var attr = controller[k];
+                            if (attr && attr.default)
+                                setValue(k, attr.default);
+                        }
+                        // Value set and binding hook
+                        for (var k in values)
+                            setValue(k, values[k]);
 
                         return ux;
                     };

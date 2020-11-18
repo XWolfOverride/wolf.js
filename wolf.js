@@ -589,7 +589,7 @@ var wolf = (() => {
                     else if (v !== undefined)// If v is undefined no concatenation is done at all
                         value = String(value) + v;
                 }
-                if (type === "string" && value === undefined)
+                if (type === "string" && (value === undefined || value === null))
                     value = "";
                 return value;
             }
@@ -1044,7 +1044,13 @@ var wolf = (() => {
             if (!template.type) {
                 element.merge({
                     // Wolfed text node API
+                    getTemplate: getTemplate,
+                    getController: getController,
+                    getControllerElement: getControllerElement,
+                    getApplication: getApplication,
+                    getApplicationController: getApplicationController,
                     getParent: getParent,
+                    setContextPath: setContextPath,
                     getContextPath: getContextPath,
                 });
                 return;
