@@ -174,8 +174,13 @@
                     var id = template.w.id;
                     var controller = {};
                     var ui = {};
-                    var ev = {};
+                    var data = [];
                     var script;
+
+                    function _ui(name) {
+                        return ui[name];
+                    }
+
                     template.c.forEach(c => {
                         switch (c.type) {
                             case "attr": {
@@ -184,22 +189,26 @@
                                 var name = c.c[0].value;
                                 if (name == "init" || name == "postInit" || name == "ctor" || name == "ui")
                                     throw new Error("Control definition wolf:" + id + " attribute '" + name + "' reserved.");
+                                if (name.indexOf(":") >= 0)
+                                    throw new Error("Control definition wolf:" + id + " attribute '" + name + "' can not have namespaces.");
                                 if (controller[name])
                                     throw new Error("Control definition wolf:" + id + " attribute '" + name + "' already defined.");
                                 var attr = controller[name] = {};
-                                if (c.a.bindable)
-                                    attr.bindable = c.a.bindable == "true";
+                                attr.bindable = c.a.bindable !== "false";
                                 if (c.a.mandatory)
                                     attr.mandatory = c.a.mandatory == "true";
+                                if (c.a.default)
+                                    attr.default = c.a.default;
+                                data.push(name);
                                 break;
                             }
                             case "event": {
                                 if (c.c.length != 1 || c.c[0].type)
                                     throw new Error("Control definition wolf:" + id + " event name missing or type error");
                                 var name = c.c[0].value;
-                                if (ev[name])
+                                if (controller["event:" + name])
                                     throw new Error("Control definition wolf:" + id + " event '" + name + "' already defined.");
-                                ev[name] = true;
+                                controller["event:" + name] = { bindable: false, mandatory: false, event: true }
                                 break;
                             }
                             case "ui": {
@@ -210,16 +219,127 @@
                                 break;
                             }
                             case "script": {
-                                script = c.c[0].value;// TODO As script uses { character is processed as binding but it is not a binding, define a way to avoid bindings on scripts (detenct " character too??)
+                                var scriptsrc = c.c[0].value;
+                                if (scriptsrc && (typeof scriptsrc != "string" || scriptsrc.indexOf("use strict") < 1))
+                                    throw new Error("Control definition wolf:" + id + " script 'use strict'; mandatory");
+                                var inc = new Function('ui', `${scriptsrc};\n//# sourceURL=_CONTROL_${id}`);
+                                script = inc(_ui);
                                 break;
                             }
                             default:
                                 throw new Error("Control definition wolf:" + id + " " + c.type + " not allowed here.");
                         }
                     });
-                    if (script && (typeof script != "string" || script.indexOf("use strict") < 1))
-                        throw new Error("Control definition wolf:" + id + " script 'use strict'; mandatory");
-                    var loader = new Function();
+                    // Standarize script
+                    if (!script)
+                        script = {}
+                    if (!script.render)
+                        script.render = () => {
+                            var u = ui["·"];
+                            if (u)
+                                return u;
+                            for (var k in ui)//return first if any
+                                return ui[k];
+                        }
+
+                    var prehooks = {
+                    }
+                    function preHookAdd(id, value) {
+                        var hl = prehooks[id];
+                        if (!hl)
+                            hl = prehooks[id] = [];
+                        hl.push(value);
+                    }
+                    function preHookUI(templ) {
+                        if (templ.c)
+                            templ.c.forEach(preHookUI);
+                        if (templ.value && templ.value[0] == "$")
+                            preHookAdd(templ.value, { t: templ });
+                        for (var k in templ.a) {
+                            var attr = templ.a[k];
+                            if (attr && attr[0] == "$")
+                                preHookAdd(attr, { t: templ, a: k });
+                        }
+                    }
+                    for (var k in ui)
+                        ui[k].forEach(templ => preHookUI(templ));
+
+
+                    // Controller logics
+                    controller.init = script.init;
+                    controller.ctor = (template, ext) => {
+                        // WARNING
+                        // WARNING
+                        // WARNING
+                        // WARNING
+                        //  No se puede usar los HOOKS así ya que los ctor de cada elemento se definen en el template, el cual es compartido
+                        //  y no se garantiza que el tiempo de ejecución de los ctor definidios aqui se ejecuten en el momento correspondiente a este ctor del custom cotnrol
+                        //
+                        //  Mirar de definir una estructura de mapeo en el UI.instanceTemplate( que permita acceso rápido a las instancias devueltas por él
+                        //  o escanear todas las instanicas dom para obtener el template de generación y comprobar con el de una lista de hooks pre definida !!!<<<!!!
+                        // WARNING
+                        // WARNING
+                        // WARNING
+                        // WARNING
+                        // Hook UI data
+                        var hooks = {
+                        }
+                        function HookUI(templ) {
+                            if (templ.c)
+                                templ.c.forEach(HookUI);
+                            if (templ.value && templ.value[0] == "$")
+                                templ.ctor = (node) => {
+                                    var hl = hooks[templ.value];
+                                    if (!hl)
+                                        hl = hooks[templ.value] = [];
+                                    hl.push(data => {
+                                        node.nodeValue = data;
+                                    });
+                                }
+                            for (var k in templ.a) {
+                                var attr = templ.a[k];
+                                if (attr && attr[0] == "$")
+                                    templ.ctor = (node) => {
+                                        var hl = hooks[attr];
+                                        if (!hl)
+                                            hl = hooks[attr] = [];
+                                        hl.push(data => {
+                                            node.setAttribute(k, data);
+                                        });
+                                    }
+                            }
+                        }
+                        for (var k in ui)
+                            ui[k].forEach(templ => HookUI(templ));
+                        var tux = script.render();
+                        var ux = [];
+                        if (!Array.isArray(tux))
+                            tux = [tux];
+                        for (var i in tux)
+                            ux = ux.concat(UI.instanceTemplate(tux[i], ext));
+
+                        for (var k in template.w) {
+                            var attr = template.w[k];
+                            if (k.startsWith("event:")) {
+                                //TODO handle events here
+                            } else
+                                if (attr instanceof D.Binding) {
+                                    attr.bindExecutor(ext.parent,
+                                        null,
+                                        null,
+                                        function (read) {
+                                            var value = read({ element: ext.parent }, "string");
+                                            // Revisar todos los hooks y establecer valor
+                                        });
+                                } else {
+                                    // Revisar todos los hooks y establecer valor
+                                }
+                        }
+
+                        return ux;
+                    };
+                    controller.controller = script; //Link script as controller
+                    UI.registerElement(id, controller);
                 },
                 ctor: (template, ext) => {
                 },

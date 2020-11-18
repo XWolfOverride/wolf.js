@@ -648,7 +648,7 @@ var wolf = (() => {
                         }
                     }
                 }
-                switch (element.tagName) {
+                switch (element.tagName) {//TODO implement special read for inputs select and more
                     default:
                         registerBindingExecutor(standard());
                         break;
@@ -694,9 +694,24 @@ var wolf = (() => {
                 });
             }
 
+            function bindExecutor(node, fninit, fnread, fnwrite) {
+                var fread;
+                var fwrite = fnwrite ? () => {
+                    fnwrite(read);
+                } : null;
+                if (fninit)
+                    init(fninit);
+                registerBindingExecutor({
+                    node: node,
+                    read: fread,
+                    write: fwrite
+                });
+            }
+
             this.bindTextNode = bindTextNode;
             this.bindElementAttribute = bindElementAttribute;
             this.bindRepeater = bindRepeater;
+            this.bindExecutor = bindExecutor;
         }
 
         return {
@@ -1093,6 +1108,8 @@ var wolf = (() => {
                     template.value.bindTextNode(tnode);
                 else
                     tnode.nodeValue = template.value;
+                if (template.ctor)
+                    template.ctor(tnode, template, ext);
                 return [tnode];
             } else if (template.we) {
                 return template.we.ctor(template, ext);
@@ -1106,6 +1123,8 @@ var wolf = (() => {
                     for (var j in nns)
                         node.appendChild(nns[j]);
                 }
+                if (template.ctor)
+                    template.ctor(node, template, ext);
                 return [node];
             }
         }
@@ -1181,8 +1200,7 @@ var wolf = (() => {
                             if (!templ.e)
                                 templ.e = {};
                             templ.e[attr] = aval;
-                        }
-                        if (attr && attr.substr(0, 5) == "wolf:") {
+                        } else if (attr && attr.substr(0, 5) == "wolf:") {
                             attr = attr.substr(5);
                             var wattr = wolfAttributes[attr];
                             if (!wattr)
