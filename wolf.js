@@ -1,4 +1,4 @@
-/*  wolf 0.6, a lightweight framework for web page creation.
+/*  wolf 0.7, a lightweight framework for web page creation.
  *  Copyright 2020 XWolfOverride (under lockdown)
  *
  *  Licensed under the MIT License
@@ -694,6 +694,13 @@ var wolf = (() => {
                 });
             }
 
+            /**
+             * Bind an external API
+             * @param {*} node DOM node
+             * @param {*} fninit Function to execute at binding init
+             * @param {*} fnread Function to execute at binding element read (write to model)
+             * @param {*} fnwrite Function to execute at binding element wrtie (read from model)
+             */
             function bindExecutor(node, fninit, fnread, fnwrite) {
                 var fread;
                 var fwrite = fnwrite ? () => {
@@ -708,10 +715,19 @@ var wolf = (() => {
                 });
             }
 
+            /**
+             * Return the actual value reflected bi the binding for the specified element
+             * @param {*} element DOM element
+             */
+            function getValue(element) {
+                return read({ element: element })
+            }
+
             this.bindTextNode = bindTextNode;
             this.bindElementAttribute = bindElementAttribute;
             this.bindRepeater = bindRepeater;
             this.bindExecutor = bindExecutor;
+            this.getValue = getValue;
         }
 
         return {
@@ -889,8 +905,9 @@ var wolf = (() => {
          * @param {*} ext Extended data
          */
         function processElement(element, template, ext) {
-            var contextPath = ext.contextPath;
-            delete ext.contextPath;
+            var contextPath = ext ? ext.contextPath : undefined;
+            var defaultParent = ext ? ext.parent : undefined; //TODO: UGLY WORKAROUND. default parent is used for parent tree calculation on early stages of control instancing. Avoid the need to have this default parent
+            var customController = ext ? ext.customController : undefined;
 
             /**
              * Return the associated template to this element
@@ -978,7 +995,7 @@ var wolf = (() => {
              * @param {string} [id] id of element 
              */
             function getParent(id) {
-                var dad = element.parentElement || ext.parent;
+                var dad = element.parentElement || defaultParent;
                 if (id) {
                     while (dad && dad != document.documentElement) {
                         if (dad.getTemplate && dad.getTemplate().type == "#app")
@@ -1085,17 +1102,26 @@ var wolf = (() => {
             }
             // process events
             function installEvent(event, method) {
-                element.addEventListener(event, (evt) => {
-                    var ctrl = element.getController();
-                    var evtMethod = ctrl[method];
-                    if (!evtMethod)
-                        throw new Error(`event '${k}' method '${method}' not found.`);
-                    evtMethod(element, evt);
-                });
+                if (customController)
+                    element.addEventListener(event, (evt) => {
+                        var evtMethod = customController[method];
+                        if (!evtMethod)
+                            throw new Error(`Method '${method}' not found for event '${k}' in custom controller.`);
+                        evtMethod(element, evt);
+                    });
+                else
+                    element.addEventListener(event, (evt) => {
+                        var ctrl = element.getController();
+                        var evtMethod = ctrl[method];
+                        if (!evtMethod)
+                            throw new Error(`Method '${method}' not found for event '${k}'.`);
+                        evtMethod(element, evt);
+                    });
             }
             if (template.e)
                 for (var k in template.e)
                     installEvent(k, template.e[k]);
+            ext.onInit && ext.onInit(element, template);
         }
 
         /**
