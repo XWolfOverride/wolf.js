@@ -190,51 +190,6 @@
             }
 
             /**
-             * Creates the attribute handler that links the definition value/event links to the control usage template
-             * @param {*} ui List of UI templates defined in control usage
-             */
-            function getTemplateAttributeHandler(ui) {
-                var attrlinks = {};
-                function preHookAdd(id, value) {
-                    var hl = attrlinks[id];
-                    if (!hl)
-                        hl = attrlinks[id] = [];
-                    hl.push(value);
-                }
-                function preHookUI(templ) {
-                    if (templ.c)
-                        templ.c.forEach(preHookUI);
-                    if (templ.value && templ.value[0] == "$")
-                        preHookAdd(templ.value, { t: templ });
-                    for (var k in templ.a) {
-                        var attr = templ.a[k];
-                        if (attr && attr[0] == "$")
-                            preHookAdd(attr, { t: templ, a: k });
-                    }
-                    for (var k in templ.e) {
-                        var event = templ.e[k];
-                        if (event && event[0] == "$")
-                            preHookAdd(event, { t: templ, e: k });
-                    }
-                }
-                for (var k in ui)
-                    ui[k].forEach(templ => {
-                        preHookUI(templ);
-                    });
-
-                function forEachOf(template, cb) {
-                    for (var k in attrlinks) {
-                        var alink = attrlinks[k];
-                        alink.forEach(alink => {
-                            if (alink.t == template)
-                                cb(k, alink);
-                        });
-                    }
-                }
-                return { forEachOf: forEachOf };
-            }
-
-            /**
              * Generates the DOM of the control based on the script render method
              * @param {*} ext ctor extended info
              */
@@ -327,9 +282,6 @@
                         }
                     }
 
-                    // Preprocess hooks                    
-                    var alinkHanlder = getTemplateAttributeHandler(ui);
-
                     // Controller logics
                     controller.ctor = (template, ext) => {
                         ext = {}.merge(ext); //Copy of ext instance
@@ -361,55 +313,36 @@
                                 script["$" + name] = eventProxy(values["event:" + name], name);
                             }
                         ext.customController = script;
+                        ext.onInit = function (element, template) {
+                            if (template.value && template.value[0] == "$") {
+                                var data = values[template.value.substr(1)];
+                                if (data instanceof D.Binding)
+                                    data.bindExecutor(element,
+                                        null,
+                                        null,
+                                        read => n.nodeValue = read({ element: element }, "string")
+                                    );
+                                else
+                                    element.nodeValue = data;
+                            }
+                            for (var k in template.a) {
+                                var attr = template.a[k];
+                                if (attr && attr[0] == "$") {
+                                    var data = values[attr.substr(1)];
+                                    if (data instanceof D.Binding)
+                                        data.bindExecutor(element,
+                                            null,
+                                            null,
+                                            read => element.setAttribute(k, read({ element: element }, "string"))
+                                        );
+                                    else
+                                        element.setAttribute(k, data);
+                                }
+                            }
+                        }
 
                         // Generate DOM
                         var ux = renderControlDOM(ext);
-
-                        // Scan generated nodes and set values or link bindings
-                        // TODO: Workaround (use the new ext.onInit event for each control initialization)
-                        function setValue(k, n, h) {
-                            if (k && k[0] == "$")
-                                k = k.substr(1);
-                            var data = values[k];
-                            if (h.e) {// Hook to event
-                                // if (!ext.parent)
-                                //     return;
-                                // var pcontroller = ext.parent.getController();
-                                // if (!pcontroller)
-                                //     return;
-                                // data = values["event:" + k];
-                                // if (!n.controlBase)
-                                //     n.controlBase = {};
-                                // n.controlBase[k] = pcontroller[data];
-                            } else if (h.a) // Hook to attribute
-                                if (data instanceof D.Binding)
-                                    data.bindExecutor(n,
-                                        null,
-                                        null,
-                                        read => n.setAttribute(h.a, read({ element: n }, "string"))
-                                    );
-                                else
-                                    n.setAttribute(h.a, data);
-                            else // Hook to text node
-                                if (data instanceof D.Binding)
-                                    data.bindExecutor(n,
-                                        null,
-                                        null,
-                                        read => n.nodeValue = read({ element: n }, "string")
-                                    );
-                                else
-                                    n.nodeValue = data;
-                        }
-                        function scanDOM(node) {
-                            node.controlBase = ext.parent;
-                            for (var i = 0; i < node.childNodes.length; i++)
-                                scanDOM(node.childNodes[i]);
-                            alinkHanlder.forEachOf(node.getTemplate(), (k, alink) => {
-                                setValue(k, node, alink);
-                            })
-                        }
-                        ux.forEach(node => scanDOM(node));
-
 
                         return ux;
                     };

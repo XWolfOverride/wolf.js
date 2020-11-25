@@ -1070,57 +1070,63 @@ var wolf = (() => {
                     setContextPath: setContextPath,
                     getContextPath: getContextPath,
                 });
-                return;
-            }
-
-            element.merge({
-                // Wolfed element API
-                getTemplate: getTemplate,
-                getController: getController,
-                getControllerElement: getControllerElement,
-                getApplication: getApplication,
-                getApplicationController: getApplicationController,
-                byId: byId,
-                getParent: getParent,
-                setContextPath: setContextPath,
-                getContextPath: getContextPath,
-                include: include,
-            });
-
-            // process standard attributes
-            for (var k in template.a) {
-                var value = template.a[k];
-                if (value instanceof D.Binding)
-                    value.bindElementAttribute(element, k);
+                // process text
+                if (template.value instanceof D.Binding)
+                    template.value.bindTextNode(element);
                 else
-                    element.setAttribute(k, value);
+                    element.nodeValue = template.value;
+            } else {
+                element.merge({
+                    // Wolfed element API
+                    getTemplate: getTemplate,
+                    getController: getController,
+                    getControllerElement: getControllerElement,
+                    getApplication: getApplication,
+                    getApplicationController: getApplicationController,
+                    byId: byId,
+                    getParent: getParent,
+                    setContextPath: setContextPath,
+                    getContextPath: getContextPath,
+                    include: include,
+                });
+
+                // process standard attributes
+                for (var k in template.a) {
+                    var value = template.a[k];
+                    if (value instanceof D.Binding)
+                        value.bindElementAttribute(element, k);
+                    else
+                        element.setAttribute(k, value);
+                }
+                // process wolf attributes
+                for (var k in template.w) {
+                    var wattr = wolfAttributes[k];
+                    wattr.processor(element, template.w[k], template);
+                }
+                // process events
+                function installEvent(event, method) {
+                    if (customController)
+                        element.addEventListener(event, (evt) => {
+                            var evtMethod = customController[method];
+                            if (!evtMethod)
+                                throw new Error(`Method '${method}' not found for event '${k}' in custom controller.`);
+                            evtMethod(element, evt);
+                        });
+                    else
+                        element.addEventListener(event, (evt) => {
+                            var ctrl = element.getController();
+                            var evtMethod = ctrl[method];
+                            if (!evtMethod)
+                                throw new Error(`Method '${method}' not found for event '${k}'.`);
+                            evtMethod(element, evt);
+                        });
+                }
+                if (template.e)
+                    for (var k in template.e)
+                        installEvent(k, template.e[k]);
             }
-            // process wolf attributes
-            for (var k in template.w) {
-                var wattr = wolfAttributes[k];
-                wattr.processor(element, template.w[k], template);
-            }
-            // process events
-            function installEvent(event, method) {
-                if (customController)
-                    element.addEventListener(event, (evt) => {
-                        var evtMethod = customController[method];
-                        if (!evtMethod)
-                            throw new Error(`Method '${method}' not found for event '${k}' in custom controller.`);
-                        evtMethod(element, evt);
-                    });
-                else
-                    element.addEventListener(event, (evt) => {
-                        var ctrl = element.getController();
-                        var evtMethod = ctrl[method];
-                        if (!evtMethod)
-                            throw new Error(`Method '${method}' not found for event '${k}'.`);
-                        evtMethod(element, evt);
-                    });
-            }
-            if (template.e)
-                for (var k in template.e)
-                    installEvent(k, template.e[k]);
+            if (template.ctor)
+                template.ctor(element, template, ext);
             ext.onInit && ext.onInit(element, template);
         }
 
@@ -1134,15 +1140,9 @@ var wolf = (() => {
          */
         function instanceTemplate(template, ext) {
             if (!template.type) {
-                var tnode = document.createTextNode("");
-                processElement(tnode, template, ext);
-                if (template.value instanceof D.Binding)
-                    template.value.bindTextNode(tnode);
-                else
-                    tnode.nodeValue = template.value;
-                if (template.ctor)
-                    template.ctor(tnode, template, ext);
-                return [tnode];
+                var node = document.createTextNode("");
+                processElement(node, template, ext);
+                return [node];
             } else if (template.we) {
                 return template.we.ctor(template, ext);
             } else if (template.type.substr(0, 5) == "wolf:") {
@@ -1150,13 +1150,14 @@ var wolf = (() => {
             } else {
                 var node = document.createElement(template.type);
                 processElement(node, template, ext);
-                for (var i in template.c) {
-                    var nns = instanceTemplate(template.c[i], { parent: node });
-                    for (var j in nns)
-                        node.appendChild(nns[j]);
+                if (template.c && template.c.length) {
+                    var childExt = {}.merge(ext).merge({ parent: node });
+                    for (var i in template.c) {
+                        var nns = instanceTemplate(template.c[i], childExt);
+                        for (var j in nns)
+                            node.appendChild(nns[j]);
+                    }
                 }
-                if (template.ctor)
-                    template.ctor(node, template, ext);
                 return [node];
             }
         }
