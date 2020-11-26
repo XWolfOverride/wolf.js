@@ -1152,12 +1152,14 @@ var wolf = (() => {
                 processElement(node, template, ext);
                 if (template.c && template.c.length) {
                     var childExt = {}.merge(ext).merge({ parent: node });
+                    delete childExt.contextPath; //TODO: erase the usage of contextPath in ext
                     for (var i in template.c) {
                         var nns = instanceTemplate(template.c[i], childExt);
                         for (var j in nns)
                             node.appendChild(nns[j]);
                     }
                 }
+                template.postInit && template.postInit(node, template, ext);
                 return [node];
             }
         }
@@ -1188,8 +1190,8 @@ var wolf = (() => {
                 //Ignore element (commentary)
                 return null;
             } else if (node.nodeType == 3) {
-                var val = node.nodeValue;
-                if (!val.trim())
+                var val = node.nodeValue.trim();
+                if (!val)
                     return null;
                 templ.value = valOrBinding(val);
             } else {

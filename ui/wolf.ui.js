@@ -224,6 +224,7 @@
             UI.registerElement("control", {
                 postInit: function (template) {
                     var id = template.w.id;
+                    var allowChildren = template.w.allowchildren == "true";
                     var controller = {};
                     var ui = {};
                     var scriptFactory;
@@ -262,7 +263,7 @@
                                 break;
                             }
                             case "ui": {
-                                var uid = c.a.id || "·";
+                                var uid = c.a.id || "";
                                 if (ui[uid])
                                     throw new Error("Control definition wolf:" + id + " ui " + (uid == "·" ? "" : "'" + uid + "'") + " already defined.");
                                 ui[uid] = c.c;
@@ -282,36 +283,54 @@
                         }
                     }
 
-                    // Controller logics
-                    controller.ctor = (template, ext) => {
+                    // Children tempaltes
+
+                    // Controller logics (new definition rendering) =============
+                    controller.postInit = function (template) {
+                        if (template.c && template.c.length && !allowChildren)
+                            throw new Error("wolf:" + id + " does not allow child nodes");
+                    };
+                    controller.ctor = function (template, ext) {
                         ext = {}.merge(ext); //Copy of ext instance
                         // Initialize attributes and script
                         var values = getControlAttributesTable(controller, template);
-                        var script = scriptFactory ? scriptFactory({
-                            ui: name => name ? ui[name] : ui["·"],
-                            get: name => {
+                        var API = {
+                            ui: name => name ? ui[name] : ui[""],
+                            value: name => {
                                 var data = values[name];
                                 if (data instanceof D.Binding)
                                     data.getValue(ext.parent);
                                 return data;
                             }
-                        }) : {};
+                        }
+                        var script = scriptFactory ? scriptFactory(API) : {};
+                        API.controller = script;
 
                         if (!script.render)
                             script.render = () => {
-                                var u = ui["·"];
+                                var u = ui[""];
                                 if (u)
                                     return u;
                                 for (var k in ui)//return first if any
                                     return ui[k];
+                                return [];
                             }
 
-                        // Event mirror
+                        // Event mirror and attribute hook
                         for (var k in values)
                             if (k.startsWith("event:")) {
                                 var name = k.substring(6);
                                 script["$" + name] = eventProxy(values["event:" + name], name);
                             }
+                        for (var k in controller)
+                            if (k.startsWith("event:") && !script["$" + k.substring(6)]) {
+                                script["$" + k.substring(6)] = function () { }; //Empty event
+                            }
+
+                        ext.getChildNodes = function (id) {
+                            //ID for usage on future with multiple chilnodes block definitions
+                            return template.c;
+                        }
                         ext.customController = script;
                         ext.onInit = function (element, template) {
                             if (template.value && template.value[0] == "$") {
@@ -320,7 +339,7 @@
                                     data.bindExecutor(element,
                                         null,
                                         null,
-                                        read => n.nodeValue = read({ element: element }, "string")
+                                        read => element.nodeValue = read({ element: element }, "string")
                                     );
                                 else
                                     element.nodeValue = data;
@@ -342,15 +361,29 @@
                         }
 
                         // Generate DOM
-                        var ux = renderControlDOM(ext);
-
-                        return ux;
+                        return renderControlDOM(ext);
                     };
                     UI.registerElement(id, controller);
                 },
                 id: { bindable: false, mandatory: true },
+                allowchildren: { bindable: false },
                 childs: { bindable: false }
             });
+
+            UI.registerElement("children", {
+                ctor: function (template, ext) {
+                    if (!ext.getChildNodes)
+                        throw new Error("wolf:children can only be used inside a wolf:control UI definition");
+                    var childTemplate = ext.getChildNodes(template.w.id);
+                    var dom = [];
+                    // Clear custom control private controller and API
+                    ext = { parent: ext.parent }
+                    for (var i in childTemplate)
+                        dom = dom.concat(UI.instanceTemplate(childTemplate[i], ext));
+                    return dom;
+                },
+                id: { bindable: false }
+            })
         }
 
         // ====================
