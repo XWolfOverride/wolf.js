@@ -196,6 +196,8 @@
             function renderControlDOM(ext) {
                 var tux = ext.customController.render();
                 var ux = [];
+                if (!tux)
+                    return [];
                 if (!Array.isArray(tux))
                     tux = [tux];
                 for (var i in tux)
@@ -275,7 +277,7 @@
                                 var script = c.c[0].value;
                                 if (script && (typeof script != "string" || script.indexOf("use strict") < 1))
                                     throw new Error("Control definition wolf:" + id + " script 'use strict'; mandatory");
-                                scriptFactory = new Function('control', `${script};\n//# sourceURL=_CONTROL_${id}`);
+                                scriptFactory = new Function('control', `${script};\n//# sourceURL=wolf:${id}`);
                                 break;
                             }
                             default:

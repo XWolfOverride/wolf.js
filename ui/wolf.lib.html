@@ -10,35 +10,6 @@
     </ui>
 </wolf:control>
 
-<wolf:control id="button2">
-    <attr mandatory="true">icon</attr>
-    <attr>text</attr>
-    <event>click</event>
-    <ui id="main">
-        <button class="button" event:click="btnClick"><i class="material-icons">$icon</i>$text</button>
-    </ui>
-    <script>
-        'use strict';
-
-        function render() {
-            return control.ui("main");
-        }
-
-        function btnClick(element, event) {
-            var ctrl = element.getController();
-            var m = ctrl[control.get("event:click")];
-            if (!m)
-                throw new Error("Me las pagarás");
-            m(element, event);
-        }
-
-        return {
-            render: render,
-            btnClick: btnClick
-        }
-    </script>
-</wolf:control>
-
 <!-- usage -->
 <!--
 <wolf:button click="goAdd" icon="add" />
