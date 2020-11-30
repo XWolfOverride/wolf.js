@@ -110,7 +110,7 @@
             var bts = [];
             buttons = buttons || { doOk: "Ok" };// Default ok button
 
-            for (bt in buttons) {
+            for (var bt in buttons) {
                 var btext = buttons[bt];
                 var cancel = btext && btext[0] == '!';
                 var deflt = btext && btext[0] == '*';
