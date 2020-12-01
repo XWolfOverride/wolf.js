@@ -301,7 +301,7 @@
                             value: name => {
                                 var data = values[name];
                                 if (data instanceof D.Binding)
-                                    data.getValue(ext.parent);
+                                    data = data.getValue(ext.parent);
                                 return data;
                             }
                         }
