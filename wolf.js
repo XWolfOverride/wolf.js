@@ -906,7 +906,7 @@ var wolf = (() => {
          */
         function processElement(element, template, ext) {
             var contextPath = ext ? ext.contextPath : undefined;
-            var defaultParent = ext ? ext.parent : undefined; //TODO: UGLY WORKAROUND. default parent is used for parent tree calculation on early stages of control instancing. Avoid the need to have this default parent
+            var defaultParent = ext ? ext.parent : undefined;
             var customController = ext ? ext.customController : undefined;
 
             /**

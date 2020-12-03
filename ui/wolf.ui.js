@@ -22,9 +22,122 @@
 (() => {
     'use strict';
     wolf.wolfExtension((K, D, UI, TOOLS) => {
-        var dlgctrl = {
-            cnt: 0,
-            modaling: false
+
+        /**
+         * Common dialog controller
+         */
+
+        function dialogControl(modal, element, controller) {
+            var modalWall; //Modal wall DOM instance
+            var base; //Base dialog DOM
+            var dialog; //Dialog DOM element
+            var body; //Dialog body DOM element
+            var buttons;// Dialog buttons footer DOM element
+            var onClose; //Callback for on close
+            // Process modaling
+            if (modal) {
+                modalWall = UI.instanceTemplate({ type: "div", a: { "class": "wolf-dialog-modal-wall" }, w: {} }, { parent: element })[0];
+                element.appendChild(modalWall);
+                base = modalWall;
+            } else
+                base = element;
+
+            // Create dialog frame
+            var dialog = UI.instanceTemplate({ type: "div", a: { "class": "wolf-dialog" }, w: {}, controller: controller }, { parent: base })[0];
+            base.appendChild(dialog);
+
+            dialog.close = function () {
+                element.removeChild((modal ? modalWall : dialog));
+                controller && controller.close && controller.close();
+                onClose && onClose(dialog.dialogController.result);
+            };
+
+            // Controller logic
+            /**
+             * Adds a UI template to the dialog and instences it
+             * @param {*} ui UI template object or array
+             */
+            function append(ui) {
+                if (!body) {
+                    body = UI.instanceTemplate({ type: "div", a: { "class": "wolf-dialog-body" }, w: {} }, { parent: dialog })[0];
+                    if (buttons)
+                        body.classList.add("with-footer");
+                    dialog.appendChild(body);
+                }
+                if (ui.insertTo) //Assuming fragment
+                    ui.insertTo(body);
+                else {
+                    if (!Array.isArray(ui))
+                        ui = [ui];
+                    ui.forEach(uielem => {
+                        var uiDOM = UI.instanceTemplate(uielem, { parent: body });
+                        uiDOM.forEach(dom => body.appendChild(dom));
+                    })
+                }
+            }
+
+            /**
+             * Adds buttons definitions or UI template to the dialog foooter
+             * @param {*} buttonsDef Button definition or UI template object or array
+             */
+            function appendButtons(buttonsDef) {
+                if (body)
+                    body.classList.add("with-footer");
+                if (!buttons) {
+                    buttons = UI.instanceTemplate({ type: "div", a: { "class": "wolf-dialog-buttons" }, w: {} }, { parent: dialog })[0];
+                    dialog.appendChild(buttons);
+                }
+                if (!Array.isArray(buttonsDef))
+                    buttonsDef = [buttonsDef];
+                buttonsDef.forEach(uidef => {
+                    if (uidef.type || uidef.value) {
+                        var uiDOM = UI.instanceTemplate(uidef);
+                        uiDOM.forEach(dom => buttons.appendChild(dom));
+                    } else
+                        for (var k in uidef) {
+                            var def = uidef[k];
+                            var button = UI.instanceTemplate({ type: "button", a: {}, w: {}, c: [{ value: def.text }] }, { parent: dialog })[0];
+                            if (def.default)
+                                button.classList.add("default");
+                            if (def.cancel)
+                                button.classList.add("cancel");
+                            installEvent(button, k, def);
+                            buttons.appendChild(button);
+                        }
+                    function installEvent(button, id, def) {
+                        button.addEventListener("click", (evt) => {
+                            var evtMethod;
+                            if (controller)
+                                evtMethod = controller[id];
+                            if (!evtMethod)
+                                evtMethod = def.click;
+                            if (!evtMethod)
+                                evtMethod = () => {
+                                    dialog.dialogController.result = id;
+                                    dialog.close();
+                                }
+                            evtMethod(element, evt, dialog);
+                        });
+                    }
+                });
+            }
+
+            /**
+             * Raises the callback of the dialog
+             * @param {*} cb callback
+             * @param {*} close callback for on close
+             */
+            function callback(cb, close) {
+                cb && cb(dialog, element, controller);
+                onClose = close;
+            }
+
+            // Return controller
+            return dialog.dialogController = {
+                append: append,
+                appendButtons: appendButtons,
+                callback: callback,
+            }
         }
 
         // ====================
@@ -52,100 +165,57 @@
 
         /**
          * Show a dialog embedding a fragment.
-         * @param {string} url Url of the fragment
          * @param {element} element Destination element, application element recommended
          * @param {boolean} modal True to show the dialog in modal way
+         * @param {string} url Url of the fragment
+         * @param {*} [buttons] Button definition
          * @param {*} [controller] Controller for the dialogs events, if none the parent element one will be used
          * @param {function} [callback] Callback when the dialog is shown
+         * @param {function} [onclose] Callback when dialog close, passing the dialog result
          */
-        function dialog(url, element, modal, controller, callback) {
-            var modalWall, dialogFrame, modaling;
-            if (modal) {
-                if (!dlgctrl.modaling)
-                    dlgctrl.modaling = modaling = true;
-                modalWall = UI.instanceTemplate({ type: "div", a: { "class": "wolf-dialog-modal-wall" }, w: {} }, { parent: element })[0];
-                element.appendChild(modalWall);
-            }
+        function dialog(element, modal, url, buttons, controller, callback, onclose) {
+            var dc = dialogControl(modal, element, controller);
+
             UI.loadFragment(url, (fragment) => {
-                dialogFrame = UI.instanceTemplate({ type: "div", a: { "class": "wolf-dialog" }, w: {}, controller: controller }, { parent: modal ? modalWall : element })[0];
-                dialogFrame.close = function () {
-                    element.removeChild((modal ? modalWall : dialogFrame))
-                    if (modaling)
-                        dlgctrl.modaling = false;
-                };
-                (modal ? modalWall : element).appendChild(dialogFrame);
-                fragment.insertTo(dialogFrame);
-                callback && callback(dialogFrame, element);
+                dc.append(fragment);
+                if (buttons)
+                    dc.appendButtons(buttons);
+                dc.callback(callback, onclose);
             });
         }
 
         /**
          * Show a dialog asking or showing information.
-         * @param {string} text Text to show
-         * @param {*} buttons Button definition
          * @param {element} element Destination element, application element recommended
          * @param {boolean} modal True to show the dialog in modal way
+         * @param {string} text Text to show
+         * @param {*} [buttons] Button definition
          * @param {*} [controller] Controller for the dialogs events, if none the parent element one will be used
          * @param {function} [callback] Callback when the dialog is shown
+         * @param {function} [onclose] Callback when dialog close, passing the dialog result
          */
-        function messageDialog(text, buttons, element, modal, controller, callback) {
-            var modalWall, dialogFrame, modaling;
-            if (modal) {
-                modalWall = UI.instanceTemplate({ type: "div", a: { "class": "wolf-dialog-modal-wall" }, w: {} }, { parent: element })[0];
-                if (!dlgctrl.modaling) {
-                    dlgctrl.modaling = modaling = true;
-                    modalWall.style.background = "transparent";
-                }
-                element.appendChild(modalWall);
-            }
-            dialogFrame = UI.instanceTemplate({ type: "div", a: { "class": "wolf-dialog wolf-dialog-message" }, w: {}, controller: controller }, { parent: modal ? modalWall : element })[0];
-            dialogFrame.close = function () {
-                element.removeChild((modal ? modalWall : dialogFrame))
-                if (modaling)
-                    dlgctrl.modaling = false;
-            };
-            (modal ? modalWall : element).appendChild(dialogFrame);
-
-            controller = controller || {};
-            var bts = [];
-            buttons = buttons || { doOk: "Ok" };// Default ok button
-
-            for (var bt in buttons) {
-                var btext = buttons[bt];
-                var cancel = btext && btext[0] == '!';
-                var deflt = btext && btext[0] == '*';
-                if (cancel || deflt)
-                    btext = btext.substr(1);
-                bts.push({
-                    type: "button", a: { class: deflt ? "default" : cancel ? "cancel" : "" }, w: {}, e: { click: bt }, c: [
-                        { type: "", value: btext }
-                    ]
-                });
-                controller[bt] = controller[bt] || dialogFrame.close;
-            }
-
-            var dlg = UI.instanceTemplate({
-                type: "div", controller: controller, a: { "class": "wolf-dialog-message-body" }, w: {}, c: [
-                    { type: "div", a: { "class": "wolf-dialog-message-text" }, w: {}, c: [{ type: "", value: text }] },
-                    { type: "div", a: { "class": "wolf-dialog-message-buttons" }, w: {}, c: bts }
-                ]
-            }, { parent: element })[0];
-            dialogFrame.appendChild(dlg);
-
-            callback && callback(dialogFrame, element);
+        function messageDialog(element, modal, text, buttons, controller, callback, onclose) {
+            if (!buttons)
+                buttons = { close: { icon: "close", cancel: true } };
+            uiDialog({ value: text }, buttons, element, modal, controller, callback, onclose)
         }
 
         /**
          * Show a dialog asking or showing information.
-         * @param {*} ui UI definition
-         * @param {*} buttons Button definition
          * @param {element} element Destination element, application element recommended
          * @param {boolean} modal True to show the dialog in modal way
+         * @param {*} ui UI body definition
+         * @param {*} [buttons] Button definition
          * @param {*} [controller] Controller for the dialogs events, if none the parent element one will be used
          * @param {function} [callback] Callback when the dialog is shown
+         * @param {function} [onclose] Callback when dialog close, passing the dialog result
          */
-        function uiDialog(ui, buttons, element, modal, controller, callback) {
-
+        function uiDialog(ui, buttons, element, modal, controller, callback, onclose) {
+            var dc = dialogControl(modal, element, controller);
+            dc.append(ui);
+            if (buttons)
+                dc.appendButtons(buttons);
+            dc.callback(callback, onclose);
         }
 
         /**
@@ -277,7 +347,7 @@
                                 var script = c.c[0].value;
                                 if (script && (typeof script != "string" || script.indexOf("use strict") < 1))
                                     throw new Error("Control definition wolf:" + id + " script 'use strict'; mandatory");
-                                scriptFactory = new Function('control', `${script};\n//# sourceURL=wolf:${id}`);
+                                scriptFactory = new Function('control', 'K', 'D', 'UI', 'TOOLS', `${script};\n//# sourceURL=wolf:${id}`);
                                 break;
                             }
                             default:
@@ -303,11 +373,20 @@
                                 if (data instanceof D.Binding)
                                     data = data.getValue(ext.parent);
                                 return data;
+                            },
+                            binding: name => {
+                                var data = values[name];
+                                if (data instanceof D.Binding)
+                                    return data;
+                                return null;
+                            },
+                            childs: name => {
+                                return ext.getChildNodes(name);
                             }
                         }
-                        var script = scriptFactory ? scriptFactory(API) : {};
+                        var script = scriptFactory ? scriptFactory(API, K, D, UI, TOOLS) : {};
                         API.controller = script;
-
+                        API.instanceTemplate = (templ, ext2) => UI.instanceTemplate(templ, ext2 ? ext2 : { parent: ext.parent, customController: script })
                         if (!script.render)
                             script.render = () => {
                                 var u = ui[""];
