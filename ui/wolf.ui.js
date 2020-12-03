@@ -96,7 +96,14 @@
                     } else
                         for (var k in uidef) {
                             var def = uidef[k];
-                            var button = UI.instanceTemplate({ type: "button", a: {}, w: {}, c: [{ value: def.text }] }, { parent: dialog })[0];
+                            if (!def)
+                                continue; //def can be null in order to cancel a button in json strucutres
+                            var btcontent = [];
+                            if (def.icon)
+                                btcontent.push({ type: "i", a: { class: "icon" + (def.text ? " with-text" : "") }, w: {}, c: [{ value: def.icon }] });
+                            if (def.text)
+                                btcontent.push({ value: def.text });
+                            var button = UI.instanceTemplate({ type: "button", a: {}, w: {}, c: btcontent }, { parent: dialog })[0];
                             if (def.default)
                                 button.classList.add("default");
                             if (def.cancel)
