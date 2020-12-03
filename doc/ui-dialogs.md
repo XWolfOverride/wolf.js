@@ -3,9 +3,9 @@
 wolf.ui extension add capacity for pop-up dialogs in an easy way.
 
 the extensionadds the next tree dialogs functions to wolf.js object:
-· wolf.dialog, to load a dialog out of an html file.
-· wolf.messaeDialog, to show simple message dialgs.
-· wolf.uiDialog, to create dialogs out of wolf.js UI templates (need knowledge about wolf.js UI templates).
+- wolf.dialog, to load a dialog out of an html file.
+- wolf.messaeDialog, to show simple message dialgs.
+- wolf.uiDialog, to create dialogs out of wolf.js UI templates (need knowledge about wolf.js UI templates).
 
 ## using dialgos
 
@@ -13,13 +13,13 @@ All dialogs on the library uses a very similar way of usage:
 
         wolf.dialog(<app-element>,<modal>,<dialog-data>,[buttons-definition],[controller],[creation-callback(<dialog-instance>)],[close-callback(<button-pressed>)]);
 
-· app-element is the parent element of the dialog, the root node of the aplication is recommended, but can be any node.
-· modal, boolean defining if the dialog is modal.
-· dialog-data, dialog usage specific data, this type and maning depends on the dialog method used. See bottom sections.
-· buttons-definition, optional but recommended, a definition of the buttons shown in the footer of the application.
-· controller, controller object used to catch elements events, recommended, if not defined app-element controller will be used instead (except buttons-definitnion).
-· creation-callback, callback to be executed once the dialog is ready and on screen, the dialog element is passed as parameter.
-· close-callback, when buttons of buttons-definition does not have an asigned function, the default function is to close the dialog and call this callback passing
+- app-element is the parent element of the dialog, the root node of the aplication is recommended, but can be any node.
+- modal, boolean defining if the dialog is modal.
+- dialog-data, dialog usage specific data, this type and maning depends on the dialog method used. See bottom sections.
+- buttons-definition, optional but recommended, a definition of the buttons shown in the footer of the application.
+- controller, controller object used to catch elements events, recommended, if not defined app-element controller will be used instead (except buttons-definitnion).
+- creation-callback, callback to be executed once the dialog is ready and on screen, the dialog element is passed as parameter.
+- close-callback, when buttons of buttons-definition does not have an asigned function, the default function is to close the dialog and call this callback passing
 the id of the button pressed.
 
 This gives a lot of ways to define a dialog and the associated logic.
@@ -95,8 +95,8 @@ The dialog button definition is an object that define button id, content, functi
         }
     }
 
-· button-id is the id of this button, if the close callback is defined, the button-id name will be passed as string or
+- button-id is the id of this button, if the close callback is defined, the button-id name will be passed as string or
 if the controller have a function with the same id will be executed instead.
-· function-definition if defined then this function is executed instead of controller's one.
+- function-definition if defined then this function is executed instead of controller's one.
 
 Multiple buttons can be defined in the definition object.
