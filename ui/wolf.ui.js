@@ -287,9 +287,9 @@
              * @param {string} method Controller method name
              * @param {string} ename Event name
              */
-            function eventProxy(method, ename) {
+            function eventProxy(method, ename, ext) {
                 return function (element, event) {
-                    var ctrl = element.getController();
+                    var ctrl = ext.parentCustom || element.getController();
                     var evtMethod = ctrl[method];
                     if (!evtMethod)
                         throw new Error(`Method '${method}' not found for event '${ename}'.`);
@@ -370,6 +370,7 @@
                             throw new Error("wolf:" + id + " does not allow child nodes");
                     };
                     controller.ctor = function (template, ext) {
+                        var parentCustom = ext.customController;
                         ext = {}.merge(ext); //Copy of ext instance
                         // Initialize attributes and script
                         var values = getControlAttributesTable(controller, template);
@@ -408,7 +409,7 @@
                         for (var k in values)
                             if (k.startsWith("event:")) {
                                 var name = k.substring(6);
-                                script["$" + name] = eventProxy(values["event:" + name], name);
+                                script["$" + name] = eventProxy(values["event:" + name], name, ext);
                             }
                         for (var k in controller)
                             if (k.startsWith("event:") && !script["$" + k.substring(6)]) {
@@ -420,6 +421,7 @@
                             return template.c;
                         }
                         ext.customController = script;
+                        ext.parentCustom = parentCustom;
                         ext.onInit = function (element, template) {
                             if (template.value && template.value[0] == "$") {
                                 var data = values[template.value.substr(1)];
