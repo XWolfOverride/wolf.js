@@ -1139,6 +1139,13 @@ var wolf = (() => {
          * @returns {element[]} Array with nodes on template
          */
         function instanceTemplate(template, ext) {
+            if (Array.isArray(template)) {
+                var result = [];
+                template.forEach(templ => {
+                    result = result.concat(instanceTemplate(templ, ext));
+                });
+                return result;
+            }
             if (!template.type) {
                 var node = document.createTextNode("");
                 processElement(node, template, ext);
@@ -1642,6 +1649,57 @@ var wolf = (() => {
             wolfElements[id] = element;
         }
 
+        /**
+         * Clones a templte in deep
+         * @param {*} templ Template object or array
+         */
+        function cloneTemplate(templ) {
+            if (!templ)
+                return;
+            if (Array.isArray(templ)) {
+                var result = [];
+                for (var i = 0; i < templ.length; i++)
+                    result[i] = cloneTemplate(templ[i]);
+                return result;
+            }
+            var clone = {};
+            if (templ.type)
+                clone.type = templ.type;
+            if (templ.value)
+                clone.value = templ.value;
+            clone.a = {};
+            if (templ.a)
+                for (var k in templ.a)
+                    clone.a[k] = templ.a[k];
+            clone.w = {};
+            if (templ.w)
+                for (var k in templ.w)
+                    clone.w[k] = templ.w[k];
+            clone.c = [];
+            if (templ.c)
+                clone.c = cloneTemplate(templ.c);
+            return clone;
+        }
+
+        // DRAFT
+        // /**
+        //  * Fetch an element or multiple by a selector string
+        //  * @param {*} templ Template object
+        //  * @param {string} selector Selector query 
+        //  * @param {boolean} multiple Return an array of matches instead of single element
+        //  */
+        // function queryTemplate(templ, selector, multiple) {
+        // }
+
+        // DRAFT
+        // /**
+        //  * Easy way to change templates structure
+        //  * @param {*} templ Template object
+        //  * @param {*} data Data structure of template changes
+        //  */
+        // function hackTemplate(templ, data) {
+        // }
+
         return {
             initApp: initApp,
             instanceTemplate: instanceTemplate,
@@ -1652,6 +1710,9 @@ var wolf = (() => {
             import: importResource,
             createNavigator: createNavigator,
             registerElement: registerElement,
+            cloneTemplate: cloneTemplate,
+            // queryTemplate: queryTemplate, DRAFT
+            // hackTemplate: hackTemplate, DRAFT
         }
     })();
 

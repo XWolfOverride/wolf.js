@@ -375,7 +375,10 @@
                         // Initialize attributes and script
                         var values = getControlAttributesTable(controller, template);
                         var API = {
-                            ui: name => name ? ui[name] : ui[""],
+                            ui: (name, clone) => {
+                                var result = name ? ui[name] : ui[""];
+                                return clone ? UI.cloneTemplate(result) : result;
+                            },
                             value: name => {
                                 var data = values[name];
                                 if (data instanceof D.Binding)
@@ -388,9 +391,7 @@
                                     return data;
                                 return null;
                             },
-                            childs: name => {
-                                return ext.getChildNodes(name);
-                            }
+                            childs: name => ext.getChildNodes(name),
                         }
                         var script = scriptFactory ? scriptFactory(API, K, D, UI, TOOLS) : {};
                         API.controller = script;
