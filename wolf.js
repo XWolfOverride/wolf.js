@@ -1792,7 +1792,7 @@ var wolf = (() => {
          * i18n handling class
          * @param {string} path Base file path of i18n property files, this sould point to the name of the root file without the .json
          * @param {string} [lang] Language code of i18n (optional, by default navigator language)
-         * @param {function} cb Callback to execute when lang tree has been chagned and loaded
+         * @param {function} gcb Callback to execute when lang tree has been chagned and loaded
          */
         function I18N(path, lang, gcb) {
             const empty = {};
@@ -1814,12 +1814,12 @@ var wolf = (() => {
                 function set(i, l) {
                     langTree[i] = l || empty;
                     langdone[i] = true;
-                    cb = cb || gcb;
+                    cb = cb;
                     if (langdone[0] && langdone[1] && langdone[2])
                         cb && cb(code);
                 }
                 if (langTree[0] == empty)
-                    loadJSON(path + ".json", l => set(0, l));
+                    loadJSON(path + ".json", l => set(0, l), () => set(0));
                 if (lang.lang)
                     loadJSON(path + `-${lang.lang}.json`, l => set(1, l), () => set(1));
                 else
@@ -1843,7 +1843,7 @@ var wolf = (() => {
              * @param {*} valueObj object with all the values to be expressed
              */
             function stringTemplateParser(expression, valueObj) {
-                const templateMatcher = /{{\s?([^{}\s]*)\s?}}/g;
+                const templateMatcher = /{\s?([^{}\s]*)\s?}/g;
                 let text = expression.replace(templateMatcher, (substring, value, index) => {
                     value = valueObj[value];
                     if (!value)
@@ -1874,7 +1874,7 @@ var wolf = (() => {
 
             if (!lang)
                 lang = navigator.language || navigator.userLanguage;
-            setLang(lang);
+            setLang(lang, gcb);
         }
 
         return {
