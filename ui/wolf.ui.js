@@ -312,6 +312,8 @@
                     for (var i = 0; i < template.c.length; i++) {
                         var c = template.c[i];
                         switch (c.type) {
+                            case null:
+                                break;
                             case "attr": {
                                 if (c.c.length != 1 || c.c[0].type)
                                     throw new Error("Control definition wolf:" + id + " attribute name missing or type error");

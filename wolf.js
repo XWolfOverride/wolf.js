@@ -44,6 +44,9 @@ var wolf = (() => {
     // ==== Kernel ==== resources loading, initializaiton and process handling
     var K = (() => {
         var objs = {}; //Map of objects by url
+        var configuration = {
+            trimTextNodes: true,
+        };
 
         /**
          * Declare an xWeb object,
@@ -286,6 +289,7 @@ var wolf = (() => {
         }
 
         return {
+            configuration: configuration,
             require: require,
             CallbackList: CallbackList,
             LoadHandler: LoadHandler,
@@ -1217,7 +1221,11 @@ var wolf = (() => {
                 //Ignore element (commentary)
                 return null;
             } else if (node.nodeType == 3) {
-                var val = node.nodeValue.trim();
+                var val = node.nodeValue;
+                if (K.configuration.trimTextNodes)
+                    val = TOOLS.smartTrim(val);
+                else if (!val.trim())
+                    val = " ";
                 if (!val)
                     return null;
                 templ.value = valOrBinding(val);
@@ -1824,6 +1832,41 @@ var wolf = (() => {
         }
 
         /**
+         * Special trimming close to browser behaviour trimming inside contents too.
+         * @param {*} s 
+         */
+        function innerTrim(s) {
+            var o = "";
+            var space = false;
+            var spaces = " \t\r\n";
+            for (var i in s) {
+                var issp = spaces.includes(s[i]);
+                if (issp && !space) {
+                    space = true;
+                    o += " ";
+                } else if (!issp) {
+                    space = false;
+                    o += s[i];
+                }
+            }
+            return o;
+        }
+
+        /**
+         * Special trimming close to browser behaviour.
+         * @param {*} s 
+         */
+        function smartTrim(s) {
+            var t = s.trim();
+            if (!t)
+                return "";
+            var spaces = " \t\r\n";
+            var sts = spaces.includes(s[0]);
+            var ens = spaces.includes(s[s.length - 1]);
+            return (sts ? " " : "") + t + (ens ? " " : "");
+        }
+
+        /**
          * i18n handling class
          * @param {string} path Base file path of i18n property files, this sould point to the name of the root file without the .json
          * @param {string} [lang] Language code of i18n (optional, by default navigator language)
@@ -1916,6 +1959,8 @@ var wolf = (() => {
             fetch: fetcher,
             wGet: wGet,
             loadJSON: loadJSON,
+            innerTrim: innerTrim,
+            smartTrim: smartTrim,
             I18N: I18N,
         }
     })()
@@ -1930,6 +1975,7 @@ var wolf = (() => {
 
     return {
         // Kernel
+        configuration: K.configuration,
         require: K.require,
         wolfExtension: wolfExtension,
         CallbackList: K.CallbackList,
@@ -1950,6 +1996,8 @@ var wolf = (() => {
         // Tools
         wGet: TOOLS.wGet,
         loadJSON: TOOLS.loadJSON,
+        smartTrim: TOOLS.smartTrim,
+        innerTrim: TOOLS.innerTrim,
         I18N: TOOLS.I18N,
     };
 })();
