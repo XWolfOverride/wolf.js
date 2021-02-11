@@ -1510,6 +1510,9 @@ var wolf = (() => {
                         if (ctrl[eventName])
                             ctrl[eventName](lh.__elem, id, data);
                     }
+                    for (var i in nav.onChange) try {
+                        nav.onChange[i](id, data);
+                    } catch { };
                 });
 
                 if (navEntry.set) {
@@ -1636,6 +1639,7 @@ var wolf = (() => {
                 navTo: navTo,
                 processHash: processHash,
                 getCurrentNavigation: getCurrentNavigation,
+                onChange: []
             }
 
             navigatorController.registerNavigator(element, nav);

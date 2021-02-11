@@ -244,6 +244,7 @@
          * Create the base element needed for the extensible UI and control building system
          */
         function InitControlDefinitions() {
+            var controlGlobal = {}; //Global control space
 
             /**
              * Return the control instance attribute values
@@ -272,13 +273,14 @@
              */
             function renderControlDOM(ext) {
                 var tux = ext.customController.render();
-                var ux = [];
                 if (!tux)
                     return [];
                 if (!Array.isArray(tux))
                     tux = [tux];
+                var ux = [];
                 for (var i in tux)
                     ux = ux.concat(UI.instanceTemplate(tux[i], ext));
+                ext.customController.processDOM && ext.customController.processDOM(ux);
                 return ux;
             }
 
@@ -364,8 +366,6 @@
                         }
                     }
 
-                    // Children tempaltes
-
                     // Controller logics (new definition rendering) =============
                     controller.postInit = function (template) {
                         if (template.c && template.c.length && !allowChildren)
@@ -394,6 +394,8 @@
                                 return null;
                             },
                             childs: name => ext.getChildNodes(name),
+                            global: controlGlobal,
+                            parent: ext.parent,
                         }
                         var script = scriptFactory ? scriptFactory(API, K, D, UI, TOOLS) : {};
                         API.controller = script;
