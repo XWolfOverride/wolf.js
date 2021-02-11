@@ -665,7 +665,7 @@ var wolf = (() => {
             function bindRepeater(parent, sibling, templates) {
                 var repeatItems = [];
                 if (parts.length != 1 || !parts[0].bind)
-                    throw new Exception("wolf:repeat does not allow composed bindings, use single one");
+                    throw new Error("wolf:repeat does not allow composed bindings, use single one");
                 var pathbar = parts[0].path;
                 if (pathbar && pathbar[pathbar.length - 1] != '/')
                     pathbar += '/';
@@ -991,22 +991,35 @@ var wolf = (() => {
             }
 
             /**
-             * Return the parent of theis element or a parent with a specified id
-             * @param {string} [id] id of element 
+             * Return the parent of theis element or a parent with a specified id or class
+             * @param {string} [idorclass] id of element or class if idorclass start with '.'
              */
-            function getParent(id) {
+            function getParent(idorclass) {
                 var dad = element.parentElement || defaultParent;
-                if (id) {
+                if (idorclass) {
                     while (dad && dad != document.documentElement) {
                         if (dad.getTemplate && dad.getTemplate().type == "#app")
                             break;
-                        if (dad.id == id)
-                            return dad;
+                        switch (idorclass[0]) {
+                            case '#':
+                                if ('#' + dad.id == idorclass)
+                                    return dad;
+                                break;
+                            case '.':
+                                if (dad.classList.contains(idorclass.substr(1)))
+                                    return dad;
+                                break;
+                            default:
+                                if (dad.id == idorclass)
+                                    return dad;
+                        }
+
                         dad = dad.getParent ? dad.getParent() : dad.parentElement;
                     }
                 } else
                     return dad;
             }
+
 
             /**
              * Sets the binding context data, updates all child nodes with relative bindings
@@ -1056,6 +1069,13 @@ var wolf = (() => {
              */
             function include(url, callback) {
                 loadFragmentTo(url, element, callback);
+            }
+
+            /**
+             * Refresh element depending on model data
+             */
+            function refresh() {
+                D.getModel().refreshElement(element);
             }
 
             if (!template.type) {
@@ -1370,6 +1390,20 @@ var wolf = (() => {
             });
         }
 
+        /**
+         * Executes an event when a desired fragment has been loaded if the fragment is already loaded executes the callback
+         */
+        function onFragmentReady(url, callback) {
+            var fragment = frgs[url];
+            if (!fragment) {
+                console.error("Only allowed on loaded or loading fragments, if fragment is not references a wait is not possible");
+            } else {
+                if (fragment instanceof K.CallbackList)
+                    fragment.add(callback);
+                else
+                    callback(fragment);
+            }
+        }
         /**
          * Importa un recurso js o css a la página
          * @param {string} url Url of the resource to add
@@ -1707,6 +1741,7 @@ var wolf = (() => {
             fetchFragment: fetchFragment,
             loadFragment: loadFragment,
             loadFragmentTo: loadFragmentTo,
+            onFragmentReady: onFragmentReady,
             import: importResource,
             createNavigator: createNavigator,
             registerElement: registerElement,
@@ -1909,6 +1944,7 @@ var wolf = (() => {
         initApp: UI.initApp,
         loadFragment: UI.loadFragment,
         loadFragmentTo: UI.loadFragmentTo,
+        onFragmentReady: UI.onFragmentReady,
         import: UI.import,
         createNavigator: UI.createNavigator,
         // Tools

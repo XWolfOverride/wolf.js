@@ -1,16 +1,25 @@
-<!-- Sample control library!! -->
+<!-- Sample for now !! -->
+<wolf:define name="button">
+    <script>
+        define({
+            click: {
+                type: "event",
+                bindable: false,
+                set: attribute => {
+                    button.addEventListener("click", event => {
 
-<wolf:control id="button">
-    <attr mandatory="true">icon</attr>
-    <attr>text</attr>
-    <attr default="btn">class</attr>
-    <event>click</event>
-    <ui>
-        <button class="$class" event:click="$click"><i class="material-icons">$icon</i>$text</button>
-    </ui>
-</wolf:control>
+                    })
+                }
+            },
+            icon: {
+                bindable: true,
+                bindTo: "icon"
+            }
+        })
+    </script>
+    <button wolf:id="button" class="icon"><i class="material-icons">{icon}</i></button>
+</wolf:define>
 
 <!-- usage -->
-<!--
 <wolf:button click="goAdd" icon="add" />
--->
+<wolf:button click="goAdd" icon="add" />
