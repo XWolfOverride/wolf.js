@@ -756,17 +756,10 @@ var wolf = (() => {
         function initApp(ctrlUrl, element) {
             K.require(ctrlUrl, (ctrl) => {
                 processElement(element, {
-                    type: "#app",
-                    controller: ctrl,
-                    a: {},
-                    w: {}
+                    $t: "#app",
+                    $controller: ctrl
                 }, element.parentElement);
-                if (ctrl.manifest) {
-                    //process manifest here
-                }
-                if (ctrl.init) {
-                    ctrl.init(element);
-                }
+                ctrl.init && ctrl.init(element);
             });
             // NOTE: data-stack es la pila de contextos de dato que se usa en la aplicación y en los bindings
         }
@@ -777,43 +770,33 @@ var wolf = (() => {
              * fragment definition, fragment can be loaded from urls and can have a cotnroller that is propagated on all childs
              */
             "fragment": {
-                init: template => {
-                    if (template.w.controller) {// Move controller
-                        template.controller = template.w.controller;
-                        delete template.w.controller;
-                    }
-                    if (template.w.id)
-                        frgs["#" + template.w.id] = template;
+                $init: template => {
+                    if (template.id)
+                        frgs["#" + template.id] = template;
                     /**
                      * Inserts the element into a parent element (replacing any content)
                      * @param {element} parentElement 
                      */
-                    function insertTo(parentElement) {
+                    template.$insertTo = function (parentElement) {
                         var nodes = instanceTemplate(template, { parent: parentElement });
                         while (parentElement.childNodes.length > 0)
                             parentElement.removeChild(parentElement.childNodes[0]);
                         for (var i in nodes)
                             parentElement.appendChild(nodes[i]);
                         var ptmpl = parentElement.getTemplate();
-                        if (!ptmpl.controller || ptmpl.fragmentedController) {
-                            ptmpl.controller = template.controller;
-                            ptmpl.fragmentedController = true;
-                        } else {
-                            console.warn("wolf: Can't install fragment controller on parent element because already have one");
-                        }
-                        if (template.controller && template.controller.init) {
-                            template.controller.init(parentElement);
-                        }
+                        if (template.$controller)
+                            if (!ptmpl.$controller || ptmpl.$fragmentedController) {
+                                ptmpl.$controller = template.$controller;
+                                ptmpl.$fragmentedController = true;
+                            } else {
+                                console.warn("wolf: Can't install fragment controller on parent element because already have one");
+                            }
+                        template.$controller && template.$controller.init && template.$controller.init(parentElement);
                     }
-                    template.insertTo = insertTo;
                 },
-                ctor: (template, ext) => {
+                $ctor: (template, ext) => {
                     var nodes = [];
-                    for (var i in template.c) {
-                        var nns = instanceTemplate(template.c[i], ext);
-                        for (var j in nns)
-                            nodes.push(nns[j]);
-                    }
+                    template.$ && template.$.forEach(son => instanceTemplate(son, ext).forEach(sonDOM => nodes.push(sonDOM)));
                     return nodes;
                 },
                 id: {
@@ -829,7 +812,7 @@ var wolf = (() => {
              * repeat all child elements, also adgust the context data for each repetition
              */
             "repeat": {
-                init: template => {
+                $init: template => {
                     if (!template.w.items)
                         throw new Error("item attribute is mandatory on wolf:repeat");
                     if (!(template.w.items instanceof D.Binding))
@@ -837,7 +820,7 @@ var wolf = (() => {
                     if (!template.c || !template.c.length == 0)
                         throw new Error("wolf:repeat requires a child");
                 },
-                ctor: template => {
+                $ctor: template => {
                     var hook = document.createElement(template.c[0].type);
                     setTimeout(() => {
                         template.w.items.bindRepeater(hook.parentElement, hook.nextSibling, template.c);
@@ -877,14 +860,14 @@ var wolf = (() => {
                 "repeat": {
                     bindable: true,
                     initTemplate: template => {
-                        var items = template.w.repeat;
+                        var items = template.repeat;
                         if (!(items instanceof D.Binding))
                             throw new Error("Only bindings can be used on xwolf:repeat");
-                        delete template.w.repeat;
+                        delete template.repeat;
                         return {
-                            type: "wolf:repeat",
-                            w: { items: items },
-                            c: [template]
+                            $t: "wolf:repeat",
+                            items: items,
+                            $: [template]
                         };
                     }
                 },
@@ -927,18 +910,18 @@ var wolf = (() => {
                 var supervisor = getControllerElement();
                 if (supervisor) {
                     var template = supervisor.getTemplate();
-                    if (typeof (template.controller) == "string") {
+                    if (typeof (template.$controller) == "string") {
                         throw new Error("Intermediate controllers not supported right now");
                         // // NOTE: Not optimal, but intermediate controllers are not optimal too.
                         // return await Promise.resolve({
                         //     then: (ok, ko) => {
-                        //         K.require(template.controller, ctrl => {
-                        //             ok(template.controller = ctrl);
+                        //         K.require(template.$controller, ctrl => {
+                        //             ok(template.$controller = ctrl);
                         //         });
                         //     }
                         // });
                     }
-                    return template.controller;
+                    return template.$controller;
                 }
             }
 
@@ -949,7 +932,7 @@ var wolf = (() => {
                 var node = element;
                 while (node && node != document.documentElement) {
                     var template = node.getTemplate();
-                    if (template && template.controller)
+                    if (template && template.$controller)
                         return node;
                     node = node.getParent();
                 }
@@ -961,17 +944,17 @@ var wolf = (() => {
             function getApplicationController() {
                 var app = getApplication();
                 if (app)
-                    return app.getTemplate().controller;
+                    return app.getTemplate().$controller;
             }
 
             /**
              * Return the application of this element tree
              */
-            function getApplication() {
+            function getApplication() { //TODO: use context, not current DOM path
                 var node = element;
                 while (node && node != document.documentElement) {
                     var template = node.getTemplate();
-                    if (template && template.type == "#app")
+                    if (template && template.$t == "#app")
                         return node;
                     node = node.getParent();
                 }
@@ -981,7 +964,7 @@ var wolf = (() => {
              * Search all the element tree (from this element) for an element with an id
              * @param {string} id id of element to search
              */
-            function byId(id) {
+            function byId(id) { //TODO: use querySelector
                 if (element.id == id)
                     return element;
                 for (var i = 0; i < element.children.length; i++) {
@@ -998,7 +981,7 @@ var wolf = (() => {
              * Return the parent of theis element or a parent with a specified id or class
              * @param {string} [idorclass] id of element or class if idorclass start with '.'
              */
-            function getParent(idorclass) {
+            function getParent(idorclass) { // TODO: Use context not DOM path
                 var dad = element.parentElement || defaultParent;
                 if (idorclass) {
                     while (dad && dad != document.documentElement) {
@@ -1082,7 +1065,7 @@ var wolf = (() => {
                 D.getModel().refreshElement(element);
             }
 
-            if (!template.type) {
+            if (!template.$t) {
                 element.merge({
                     // Wolfed text node API
                     getTemplate: getTemplate,
@@ -1093,12 +1076,13 @@ var wolf = (() => {
                     getParent: getParent,
                     setContextPath: setContextPath,
                     getContextPath: getContextPath,
+                    refresh: refresh,
                 });
                 // process text
-                if (template.value instanceof D.Binding)
-                    template.value.bindTextNode(element);
+                if (template.$ instanceof D.Binding)
+                    template.$.bindTextNode(element);
                 else
-                    element.nodeValue = template.value;
+                    element.nodeValue = template.$;
             } else {
                 element.merge({
                     // Wolfed element API
@@ -1112,20 +1096,20 @@ var wolf = (() => {
                     setContextPath: setContextPath,
                     getContextPath: getContextPath,
                     include: include,
+                    refresh: refresh,
                 });
 
-                // process standard attributes
-                for (var k in template.a) {
-                    var value = template.a[k];
-                    if (value instanceof D.Binding)
+                // process attributes
+                for (var k in template) {
+                    if (k[0] == "$")
+                        continue;
+                    var value = template[k];
+                    if (typeof value === "function")
+                        value(element);
+                    else if (value instanceof D.Binding)
                         value.bindElementAttribute(element, k);
                     else
                         element.setAttribute(k, value);
-                }
-                // process wolf attributes
-                for (var k in template.w) {
-                    var wattr = wolfAttributes[k];
-                    wattr.processor(element, template.w[k], template);
                 }
                 // process events
                 function installEvent(event, method) {
@@ -1145,13 +1129,12 @@ var wolf = (() => {
                             evtMethod(element, evt);
                         });
                 }
-                if (template.e)
-                    for (var k in template.e)
-                        installEvent(k, template.e[k]);
+                if (template.$e)
+                    for (var k in template.$e)
+                        installEvent(k, template.$e[k]);
             }
-            if (template.ctor)
-                template.ctor(element, template, ext);
-            ext.onInit && ext.onInit(element, template);
+            template.ctor && template.ctor(element, template, ext);
+            ext.onRender && ext.onRender(element, template, ext);
         }
 
         /**
@@ -1170,27 +1153,25 @@ var wolf = (() => {
                 });
                 return result;
             }
-            if (!template.type) {
+            if (!template.$t) {
                 var node = document.createTextNode("");
                 processElement(node, template, ext);
                 return [node];
-            } else if (template.we) {
-                return template.we.ctor(template, ext);
-            } else if (template.type.substr(0, 5) == "wolf:") {
-                return wolfElements[template.type.substr(5)].ctor(template, ext);
+            } else if (template.$w) {
+                return template.$w.$ctor(template, ext);
+            } else if (template.$t.substr(0, 5) == "wolf:") {
+                throw new Error("TEST! Template without precache");
+                template.$w = wolfElements[template.$T.substr(5)];
+                return template.$w.$ctor(template, ext);
             } else {
-                var node = document.createElement(template.type);
+                var node = document.createElement(template.$t);
                 processElement(node, template, ext);
-                if (template.c && template.c.length) {
+                if (template.$ && template.$.length) {
                     var childExt = {}.merge(ext).merge({ parent: node });
-                    delete childExt.contextPath; //TODO: erase the usage of contextPath in ext
-                    for (var i in template.c) {
-                        var nns = instanceTemplate(template.c[i], childExt);
-                        for (var j in nns)
-                            node.appendChild(nns[j]);
-                    }
+                    delete childExt.contextPath; //TODO: erase the usage of contextPath in ext, or do not cache contextpath when initTemplate is done
+                    template.$.forEach(son => instanceTemplate(son, childExt).forEach(sonDOM => node.appendChild(sonDOM)));
                 }
-                template.postInit && template.postInit(node, template, ext);
+                template.$onRender && template.$onRender(node, template, ext); //TODO: refactor postInit to $onRender
                 return [node];
             }
         }
@@ -1198,21 +1179,16 @@ var wolf = (() => {
          * Process an element template and it's childs, preparing the logics and binding maps
          * @param {element} element 
          */
-        function readTemplate(node) {
+        function readTemplate(node, parent) {
             /**
              * @callback readTemplate_callback
              * @param {*} template template processed completely
              */
 
-            var templ = {
-                type: null,
-                w: {},
-                a: {},
-                c: [],
-            }, initiators = [];
+            var templ = {}, initiators = [];
 
             function valOrBinding(val) {
-                if (typeof (val) === "string" && val.length < 512 && val.indexOf('{') >= 0 && val.indexOf("'use strict';") < 0 && val.indexOf('"use strict";') < 0)
+                if (typeof val === "string" && val.indexOf('{') >= 0)
                     return new D.Binding(val);
                 return val;
             }
@@ -1228,88 +1204,93 @@ var wolf = (() => {
                     val = " ";
                 if (!val)
                     return null;
-                templ.value = valOrBinding(val);
+                if (parent && parent.$t == "script")
+                    templ.$ = val;
+                else
+                    templ.$ = valOrBinding(val);
             } else {
-                templ.type = node.tagName.toLowerCase();
-                if (templ.type.substr(0, 5) == "wolf:") {// Wolf element!
-                    var wdef = templ.we = wolfElements[templ.type.substr(5)];
+                var tagname = templ.$t = node.tagName.toLowerCase();
+                if (tagname.substr(0, 5) == "wolf:") {// Wolf element!
+                    var wdef = templ.$w = wolfElements[tagname.substr(5)];
                     if (!wdef)
-                        throw new Error("Unknown element: " + templ.type);
+                        throw new Error("Unknown element: " + tagname);
                     node.getAttributeNames().forEach(attr => {
-                        if (attr == "init")
-                            throw new Error("init is a reserved attribute");
-                        if (attr == "postInit")
-                            throw new Error("postInit is a reserved attribute");
-                        if (attr == "ctor")
-                            throw new Error("ctor is a reserved attribute");
+                        if (attr[0] == "$")
+                            throw new Error(attr + " attribute name is not valid");
+                        attr = attr.toLowerCase();
                         var attri = wdef[attr];
                         if (!attri)
-                            throw new Error(templ.type + " does not allow " + attr + " attribute");
+                            throw new Error(tagname + " does not allow " + attr + " attribute");
                         var aval = valOrBinding(node.getAttribute(attr));
                         if ((aval instanceof D.Binding) && !attri.bindable)
-                            throw new Error(templ.type + " attribute " + attr + " can not be binded");
-                        templ.w[attr] = aval;
+                            throw new Error(tagname + " attribute " + attr + " can not be binded");
+                        templ[attr] = aval;
                     });
                     for (var k in wdef) {
-                        if (k == "init" || k == "postInit" || k == "ctor")
+                        if (k[0] == "$")
                             continue;
-                        if (wdef[k].mandatory && !templ.w[k])
-                            throw new Error(templ.type + " attribute " + k + " is mandatory");
+                        if (wdef[k].mandatory && !templ[k])
+                            throw new Error(tagname + " attribute " + k + " is mandatory");
                     }
-                    wdef.init && wdef.init(templ);
-                } else {
-                    var attrs = node.getAttributeNames();
-                    for (var i in attrs) {
-                        var attr = attrs[i];
+                    wdef.$init && initiators.push(wdef.$init);
+                } else { // Normal element
+                    node.getAttributeNames().forEach(attr => {
+                        if (attr[0] == "$")
+                            throw new Error(attr + " attribute name is not valid");
+                        attr = attr.toLowerCase();
                         var aval = valOrBinding(node.getAttribute(attr));
-
                         if (attr && attr.substr(0, 6) == "event:") {
                             attr = attr.substr(6);
+                            if (attr[0] == "$")
+                                throw new Error("event:" + attr + " attribute name is not valid");
                             if (aval instanceof D.Binding)
                                 throw new Error("Events can not be binded");
-                            if (!templ.e)
-                                templ.e = {};
-                            templ.e[attr] = aval;
+                            if (!templ.$e)
+                                templ.$e = {};
+                            templ.$e[attr] = aval;
                         } else if (attr && attr.substr(0, 5) == "wolf:") {
-                            attr = attr.substr(5);
-                            var wattr = wolfAttributes[attr];
+                            var attrName = attr.substr(5);
+                            if (attrName[0] == "$")
+                                throw new Error(attr + " attribute name is not valid");
+                            var wattr = wolfAttributes[attrName];
                             if (!wattr)
-                                throw new Error("Unknown attribute wolf:" + attr);
+                                throw new Error("Unknown global attribute wolf:" + attr);
                             if (aval instanceof D.Binding && !wattr.bindable)
-                                throw new Error("wolf:" + attr + " does not allow binding");
-                            templ.w[attr] = aval;
-                            if (wattr.initTemplate)
-                                initiators.push(wattr.initTemplate);
+                                throw new Error(attr + " does not allow binding");
+                            (value => templ[attrName] = element => wattr.processor(element, value, templ))(aval);
+                            //TODO: do not like this solution, maily for wolf:repeat attribute because <wolf:repeat> element
+                            //      get relocated then repeating tr or tds inside a table.
+                            //      Better try to parse the HTML manually when reading templates to avoid node relocations
+                            wattr.initTemplate && initiators.push(wattr.initTemplate);
                         } else if (attr && attr.substr(0, 5) == "bind:") {
+                            attr = attr.substr(5);
+                            if (attr[0] == "$")
+                                throw new Error("bind:" + attr + " attribute name is not valid");
                             if (!(aval instanceof D.Binding))
                                 throw new Error("Use bind:#### attributes only for binding");
-                            templ.a[attr.substr(5)] = aval;
+                            templ[attr] = aval;
                         } else {
-                            // if (aval instanceof D.Binding) //Force unbinded items?
-                            //     throw new Error("Use bind: attributes for binding");
-                            templ.a[attr] = aval;
+                            templ[attr] = aval;
                         }
-                    }
+                    });
                 }
 
                 // Process childs
-                for (var ci = 0; ci < node.childNodes.length; ci++) {
-                    var tn = readTemplate(node.childNodes[ci]);
-                    if (tn)
-                        templ.c.push(tn);
-                }
+                if (templ.$t)
+                    for (var ci = 0; ci < node.childNodes.length; ci++) {
+                        var tn = readTemplate(node.childNodes[ci], templ);
+                        if (tn) {
+                            if (!templ.$)
+                                templ.$ = [];
+                            templ.$.push(tn);
+                        }
+                    }
 
                 initiators.forEach(init => {
-                    //TODO: do not like this solution, maily for wolf:repeat attribute because <wolf:repeat> element
-                    //      get relocated then repeating tr or tds inside a table.
-                    //      Better try to parse the HTML manually when reading templates to avoid node relocations
-                    templ = init(templ);
+                    var ttempl = init(templ);
+                    if (ttempl !== undefined)
+                        templ = ttempl;
                 });
-
-                // PostInit
-                //templ.postInit && templ.postInit();
-                if (templ.we)
-                    templ.we.postInit && templ.we.postInit(templ);
             }
             return templ;
         }
@@ -1393,7 +1374,7 @@ var wolf = (() => {
              * @param {element} element Element to insert fragment
              */
             loadFragment(url, (fragment) => {
-                fragment.insertTo(element);
+                fragment.$insertTo(element);
                 callback && callback(fragment, element);
             });
         }
@@ -1673,12 +1654,15 @@ var wolf = (() => {
                 callback && callback(nav);
             }
 
-            if (typeof (navigationMap) === 'string') {
+            if (typeof navigationMap === 'string') {
                 TOOLS.loadJSON(navigationMap, data => {
                     navigationMap = data;
                     initNavigation();
                 }, e => {
-                    throw new Error("Can't load the navigation map at: " + navigationMap + "\n(" + e + ")");
+                    if (typeof navigationMap === 'string')
+                        throw new Error("Can't load the navigation map at: " + navigationMap + "\n(" + e + ")");
+                    else
+                        throw e;
                 });
             } else {
                 initNavigation();

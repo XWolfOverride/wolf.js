@@ -260,8 +260,10 @@
                         values[k] = attr.default;
                 }
                 // UI usage values
-                for (var k in template.w) {
-                    var attr = template.w[k];
+                for (var k in template) {
+                    if (k[0] == "$")
+                        continue;
+                    var attr = template[k];
                     values[k] = attr;
                 }
                 return values;
@@ -303,41 +305,44 @@
              * Register wolf:control as control definition structure
              */
             UI.registerElement("control", {
-                postInit: function (template) {
-                    var id = template.w.id;
-                    var allowChildren = template.w.allowchildren == "true";
+                $init: function (template) {
+                    var id = template.id;
+                    var allowChildren = template.allowchildren == "true";
                     var controller = {};
                     var ui = {};
                     var scriptFactory;
 
+                    if (!id)
+                        throw new Error("Can't define a control without id");
+                    if (!template.$) {
+                        console.warn("wolf:" + id + " empty definition");
+                        return null;
+                    }
                     // Read definition
-                    for (var i = 0; i < template.c.length; i++) {
-                        var c = template.c[i];
-                        switch (c.type) {
+                    template.$.forEach(c => {
+                        switch (c.$t) {
                             case null:
                                 break;
                             case "attr": {
-                                if (c.c.length != 1 || c.c[0].type)
+                                if (c.$.length != 1 || c.$[0].$t)
                                     throw new Error("Control definition wolf:" + id + " attribute name missing or type error");
-                                var name = c.c[0].value;
-                                if (name == "init" || name == "postInit" || name == "ctor" || name == "ui")
-                                    throw new Error("Control definition wolf:" + id + " attribute '" + name + "' reserved.");
+                                var name = c.$[0].$;
+                                if (name[0] == "$" || name == "ui")
+                                    throw new Error("Control definition wolf:" + id + " attribute '" + name + "' not valid or reserved.");
                                 if (name.indexOf(":") >= 0)
                                     throw new Error("Control definition wolf:" + id + " attribute '" + name + "' can not have namespaces.");
                                 if (controller[name])
                                     throw new Error("Control definition wolf:" + id + " attribute '" + name + "' already defined.");
                                 var attr = controller[name] = {};
-                                attr.bindable = c.a.bindable !== "false";
-                                if (c.a.mandatory)
-                                    attr.mandatory = c.a.mandatory == "true";
-                                if (c.a.default)
-                                    attr.default = c.a.default;
+                                attr.bindable = c.bindable !== "false";
+                                attr.mandatory = c.mandatory == "true";
+                                attr.default = c.default;
                                 break;
                             }
                             case "event": {
-                                if (c.c.length != 1 || c.c[0].type)
+                                if (c.$.length != 1 || c.$[0].$t)
                                     throw new Error("Control definition wolf:" + id + " event name missing or type error");
-                                var name = c.c[0].value;
+                                var name = c.$[0].$;
                                 if (controller[name])
                                     throw new Error("Control definition wolf:" + id + " events and values can not share the same name  (" + name + ").");
                                 if (controller["event:" + name])
@@ -346,16 +351,16 @@
                                 break;
                             }
                             case "ui": {
-                                var uid = c.a.id || "";
+                                var uid = c.id || "";
                                 if (ui[uid])
-                                    throw new Error("Control definition wolf:" + id + " ui " + (uid == "·" ? "" : "'" + uid + "'") + " already defined.");
-                                ui[uid] = c.c;
+                                    throw new Error("Control definition wolf:" + id + " ui " + (uid == "" ? "[default]" : "'" + uid + "'") + " already defined.");
+                                ui[uid] = c.$;
                                 break;
                             }
                             case "script": {
                                 if (scriptFactory)
                                     throw new Error("Control definition wolf:" + id + " script already defined.");
-                                var script = c.c[0].value;
+                                var script = c.$[0].$;
                                 if (script && (typeof script != "string" || script.indexOf("use strict") < 1))
                                     throw new Error("Control definition wolf:" + id + " script 'use strict'; mandatory");
                                 scriptFactory = new Function('control', 'K', 'D', 'UI', 'TOOLS', `${script};\n//# sourceURL=wolf:${id}`);
@@ -364,14 +369,14 @@
                             default:
                                 throw new Error("Control definition wolf:" + id + " " + c.type + " not allowed here.");
                         }
-                    }
+                    });
 
                     // Controller logics (new definition rendering) =============
-                    controller.postInit = function (template) {
-                        if (template.c && template.c.length && !allowChildren)
+                    controller.$init = function (template) {
+                        if (template.$ && template.$.length && !allowChildren)
                             throw new Error("wolf:" + id + " does not allow child nodes");
                     };
-                    controller.ctor = function (template, ext) {
+                    controller.$ctor = function (template, ext) {
                         var parentCustom = ext.customController;
                         ext = {}.merge(ext); //Copy of ext instance
                         // Initialize attributes and script
@@ -397,14 +402,11 @@
                             global: controlGlobal,
                             parent: ext.parent,
                         }
-                        var script = scriptFactory ? scriptFactory(API, K, D, UI, TOOLS) : {};
+                        var script = scriptFactory ? new scriptFactory(API, K, D, UI, TOOLS) : {};
                         API.controller = script;
                         API.instanceTemplate = (templ, ext2) => UI.instanceTemplate(templ, ext2 ? ext2 : { parent: ext.parent, customController: script })
                         if (!script.render)
                             script.render = () => {
-                                var u = ui[""];
-                                if (u)
-                                    return u;
                                 for (var k in ui)//return first if any
                                     return ui[k];
                                 return [];
@@ -427,9 +429,11 @@
                         }
                         ext.customController = script;
                         ext.parentCustom = parentCustom;
-                        ext.onInit = function (element, template) {
-                            if (template.value && template.value[0] == "$") {
-                                var data = values[template.value.substr(1)];
+                        //TODO: Replace with a local binding (bindings to values object only, creating a local model only for this control)
+                        //      - access this local binding with {$name}
+                        ext.onRender = function (element, template) {
+                            if (!template.$t && template.$ && template.$[0] == "$") {
+                                var data = values[template.$.substr(1)];
                                 if (data instanceof D.Binding)
                                     data.bindExecutor(element,
                                         null,
@@ -454,6 +458,7 @@
                                 }
                             }
                         }
+                        //TODO: Create control defined custom properties for attributes that change the attribute values
 
                         // Generate DOM
                         return renderControlDOM(ext);
@@ -466,10 +471,10 @@
             });
 
             UI.registerElement("children", {
-                ctor: function (template, ext) {
+                $ctor: function (template, ext) {
                     if (!ext.getChildNodes)
                         throw new Error("wolf:children can only be used inside a wolf:control UI definition");
-                    var childTemplate = ext.getChildNodes(template.w.id);
+                    var childTemplate = ext.getChildNodes(template.id);
                     var dom = [];
                     // Clear custom control private controller and API
                     ext = { parent: ext.parent }
