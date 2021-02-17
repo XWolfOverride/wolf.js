@@ -323,7 +323,7 @@
                             case null:
                                 break;
                             case "attr": {
-                                if (c.$.length != 1 || c.$[0].$t)
+                                if (!c.$ || c.$.length != 1 || c.$[0].$t)
                                     throw new Error("Control definition wolf:" + id + " attribute name missing or type error");
                                 var name = c.$[0].$;
                                 if (name[0] == "$" || name == "ui")
@@ -339,7 +339,7 @@
                                 break;
                             }
                             case "event": {
-                                if (c.$.length != 1 || c.$[0].$t)
+                                if (!c.$ || c.$.length != 1 || c.$[0].$t)
                                     throw new Error("Control definition wolf:" + id + " event name missing or type error");
                                 var name = c.$[0].$;
                                 if (controller[name])
@@ -419,8 +419,6 @@
                                 throw new Error("wolf:" + id + " does not have ui defined");
                             }
 
-                        script.init && script.init();
-
                         // Event mirror and attribute hook
                         for (var k in values)
                             if (k.startsWith("event:")) {
@@ -470,6 +468,7 @@
                             }
                         }
                         //TODO: Create control defined custom properties for attributes that change the attribute values
+                        script.init && script.init();
 
                         // Generate DOM
                         return renderControlDOM(ext);

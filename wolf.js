@@ -748,6 +748,13 @@ var wolf = (() => {
     var UI = (() => {
         var frgs = {}, navigatorController;
 
+        /**
+         * Template class
+         */
+        function Template() {
+
+        }
+
         /** Initializes an application, an application is only a definition of the container element in the document
          * and the url of the application controller, a single web page can contains several applications
          * @param {string} ctrlUrl url for the application controller
@@ -859,8 +866,7 @@ var wolf = (() => {
                  */
                 "repeat": {
                     bindable: true,
-                    initTemplate: template => {
-                        var items = template.repeat;
+                    initTemplate: (template, items) => {
                         if (!(items instanceof D.Binding))
                             throw new Error("Only bindings can be used on xwolf:repeat");
                         delete template.repeat;
@@ -880,6 +886,17 @@ var wolf = (() => {
                     bindable: false,
                     processor: function (element, value, template) {
                         element.setContextPath(value);
+                    }
+                },
+
+                /**
+                 * wolf:id
+                 * for tagging templates
+                 */
+                "id": {
+                    bindable: false,
+                    initTemplate: (template, value) => {
+                        template.$id = value;
                     }
                 }
             }
@@ -1185,7 +1202,7 @@ var wolf = (() => {
              * @param {*} template template processed completely
              */
 
-            var templ = {}, initiators = [];
+            var templ = new Template(), initiators = [];
 
             function valOrBinding(val) {
                 if (typeof val === "string" && val.indexOf('{') >= 0)
@@ -1257,11 +1274,13 @@ var wolf = (() => {
                                 throw new Error("Unknown global attribute wolf:" + attr);
                             if (aval instanceof D.Binding && !wattr.bindable)
                                 throw new Error(attr + " does not allow binding");
-                            (value => templ[attrName] = element => wattr.processor(element, value, templ))(aval);
+                            if (wattr.processor)
+                                templ[attrName] = element => wattr.processor(element, aval, templ);
                             //TODO: do not like this solution, maily for wolf:repeat attribute because <wolf:repeat> element
                             //      get relocated then repeating tr or tds inside a table.
                             //      Better try to parse the HTML manually when reading templates to avoid node relocations
-                            wattr.initTemplate && initiators.push(wattr.initTemplate);
+                            if (wattr.initTemplate)
+                                initiators.push(ttempl => wattr.initTemplate(ttempl, aval));
                         } else if (attr && attr.substr(0, 5) == "bind:") {
                             attr = attr.substr(5);
                             if (attr[0] == "$")
@@ -1696,7 +1715,7 @@ var wolf = (() => {
 
             // Does not clone events??
             delete clone.$e;
-            if (templ.$ && Array.isArray(templ.$))            
+            if (templ.$ && Array.isArray(templ.$))
                 clone.$ = cloneTemplate(templ.$);
             return clone;
         }
@@ -1719,6 +1738,8 @@ var wolf = (() => {
         //  */
         // function hackTemplate(templ, data) {
         // }
+
+        //Template.prototype
 
         return {
             initApp: initApp,
