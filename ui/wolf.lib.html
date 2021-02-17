@@ -10,6 +10,23 @@
     </ui>
 </wolf:control>
 
+<wolf:define id="test">
+    <ui>
+        <button id="$id" class="$class"><i class="material-icons">$icon</i>$text</button>
+    </ui>
+    <script>
+        var ui = {};
+
+        this.define = function (definition) {
+            definition.addAttribute("id", false, null);
+        }
+
+        this.init = function () {
+
+        }
+    </script>
+</wolf:define>
+
 <!-- usage -->
 <wolf:button click="goAdd" icon="add" />
 <wolf:button click="goAdd" icon="add" />

@@ -263,8 +263,7 @@
                 for (var k in template) {
                     if (k[0] == "$")
                         continue;
-                    var attr = template[k];
-                    values[k] = attr;
+                    values[k] = template[k];
                 }
                 return values;
             }
@@ -371,11 +370,18 @@
                         }
                     });
 
+                    if (scriptFactory) {//TODO: use this single instance of script
+                        var script = new scriptFactory(null, K, D, UI, TOOLS);
+                        if (script.define)
+                            controller = script.define(controller);
+                    }
+
                     // Controller logics (new definition rendering) =============
                     controller.$init = function (template) {
                         if (template.$ && template.$.length && !allowChildren)
                             throw new Error("wolf:" + id + " does not allow child nodes");
                     };
+
                     controller.$ctor = function (template, ext) {
                         var parentCustom = ext.customController;
                         ext = {}.merge(ext); //Copy of ext instance
@@ -384,7 +390,7 @@
                         var API = {
                             ui: (name, clone) => {
                                 var result = name ? ui[name] : ui[""];
-                                return clone ? UI.cloneTemplate(result) : result;
+                                return clone !== false ? UI.cloneTemplate(result) : result;
                             },
                             value: name => {
                                 var data = values[name];
@@ -401,6 +407,7 @@
                             childs: name => ext.getChildNodes(name),
                             global: controlGlobal,
                             parent: ext.parent,
+                            values: values,
                         }
                         var script = scriptFactory ? new scriptFactory(API, K, D, UI, TOOLS) : {};
                         API.controller = script;
@@ -409,8 +416,10 @@
                             script.render = () => {
                                 for (var k in ui)//return first if any
                                     return ui[k];
-                                return [];
+                                throw new Error("wolf:" + id + " does not have ui defined");
                             }
+
+                        script.init && script.init();
 
                         // Event mirror and attribute hook
                         for (var k in values)
@@ -425,7 +434,7 @@
 
                         ext.getChildNodes = function (id) {
                             //ID for usage on future with multiple chilnodes block definitions
-                            return template.c;
+                            return template.$;
                         }
                         ext.customController = script;
                         ext.parentCustom = parentCustom;
@@ -443,8 +452,10 @@
                                 else
                                     element.nodeValue = data;
                             }
-                            for (var k in template.a) {
-                                var attr = template.a[k];
+                            for (var k in template) {
+                                if (k[0] == "$")
+                                    continue;
+                                var attr = template[k];
                                 if (attr && attr[0] == "$") {
                                     var data = values[attr.substr(1)];
                                     if (data instanceof D.Binding)

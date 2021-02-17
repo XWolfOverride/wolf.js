@@ -1692,22 +1692,12 @@ var wolf = (() => {
                     result[i] = cloneTemplate(templ[i]);
                 return result;
             }
-            var clone = {};
-            if (templ.type)
-                clone.type = templ.type;
-            if (templ.value)
-                clone.value = templ.value;
-            clone.a = {};
-            if (templ.a)
-                for (var k in templ.a)
-                    clone.a[k] = templ.a[k];
-            clone.w = {};
-            if (templ.w)
-                for (var k in templ.w)
-                    clone.w[k] = templ.w[k];
-            clone.c = [];
-            if (templ.c)
-                clone.c = cloneTemplate(templ.c);
+            var clone = {}.merge(templ);
+
+            // Does not clone events??
+            delete clone.$e;
+            if (templ.$ && Array.isArray(templ.$))            
+                clone.$ = cloneTemplate(templ.$);
             return clone;
         }
 
