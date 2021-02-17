@@ -778,8 +778,14 @@ var wolf = (() => {
              */
             "fragment": {
                 $init: template => {
-                    if (template.id)
+                    if (template.id) {
                         frgs["#" + template.id] = template;
+                        delete template.id;
+                    }
+                    if (template.controller) {
+                        template.$controller = template.controller;
+                        delete template.controller;
+                    }
                     /**
                      * Inserts the element into a parent element (replacing any content)
                      * @param {element} parentElement 
@@ -820,17 +826,17 @@ var wolf = (() => {
              */
             "repeat": {
                 $init: template => {
-                    if (!template.w.items)
+                    if (!template.items)
                         throw new Error("item attribute is mandatory on wolf:repeat");
-                    if (!(template.w.items instanceof D.Binding))
+                    if (!(template.items instanceof D.Binding))
                         throw new Error("item attribute must be a binding wolf:repeat");
-                    if (!template.c || !template.c.length == 0)
+                    if (!template.$ || template.$.length == 0)
                         throw new Error("wolf:repeat requires a child");
                 },
                 $ctor: template => {
-                    var hook = document.createElement(template.c[0].type);
+                    var hook = document.createElement(template.$[0].type);
                     setTimeout(() => {
-                        template.w.items.bindRepeater(hook.parentElement, hook.nextSibling, template.c);
+                        template.items.bindRepeater(hook.parentElement, hook.nextSibling, template.$);
                         hook.parentElement.removeChild(hook);//Clear hook
                     });
                     return [hook];
@@ -1035,7 +1041,7 @@ var wolf = (() => {
             }
 
             /**
-             * Get the current binding context data
+             * Get the current binding context path
              * @param {string} path Path for composing
              */
             function getContextPath(path) {
@@ -1067,6 +1073,14 @@ var wolf = (() => {
             }
 
             /**
+             * Get the context object based on contextpath
+             * @param {string} path Relative Path (optional)
+             */
+            function getContextData(path) {
+                return wolf.getModel().getProperty(getContextPath(path));
+            }
+
+            /**
              * Include a fragment into this element
              * @param {string} url 
              * @param {loadFragmentTo_callback} callback Called once fragment has been loaded and set on element
@@ -1093,6 +1107,7 @@ var wolf = (() => {
                     getParent: getParent,
                     setContextPath: setContextPath,
                     getContextPath: getContextPath,
+                    getContextData: getContextData,
                     refresh: refresh,
                 });
                 // process text
@@ -1112,6 +1127,7 @@ var wolf = (() => {
                     getParent: getParent,
                     setContextPath: setContextPath,
                     getContextPath: getContextPath,
+                    getContextData: getContextData,
                     include: include,
                     refresh: refresh,
                 });
@@ -1324,9 +1340,9 @@ var wolf = (() => {
             //  --- Needed for template repetitions
             var fragment = readTemplate(fragmentElement);
 
-            if (fragment.controller && typeof (fragment.controller) === "string") {
-                K.require(fragment.controller, (ctrl) => {
-                    fragment.controller = ctrl;
+            if (fragment.$controller && typeof (fragment.$controller) === "string") {
+                K.require(fragment.$controller, (ctrl) => {
+                    fragment.$controller = ctrl;
                     callback && callback(fragment);
                 });
             } else callback && callback(fragment);
