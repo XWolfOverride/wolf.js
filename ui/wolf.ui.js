@@ -294,7 +294,7 @@
              */
             function eventProxy(method, ename, ext) {
                 return function (element, event) {
-                    var ctrl = ext.parentCustom || element.getController();
+                    var ctrl = ext.parentCustom || element.getController(); //TODO: This hide the controller if there is a custom
                     var evtMethod = ctrl[method];
                     if (!evtMethod)
                         throw new Error(`Method '${method}' not found for event '${ename}'.`);
@@ -410,22 +410,12 @@
                         }
                         var script = scriptFactory ? new scriptFactory(API, K, D, UI, TOOLS) : {};
                         API.controller = script;
-                        API.instanceTemplate = (templ, ext2) => UI.instanceTemplate(templ, ext2 ? ext2 : { parent: ext.parent, customController: script })
+                        API.instanceTemplate = (templ, ext2) => UI.instanceTemplate(templ, ext2 ? ext2 : { parent: API.parent, customController: script })
                         if (!script.build)
                             script.build = () => {
                                 return ui[""];
                             }
 
-                        // Event mirror and attribute hook
-                        for (var k in values)
-                            if (k.startsWith("event:")) {
-                                var name = k.substring(6);
-                                script["$" + name] = eventProxy(values["event:" + name], name, ext);
-                            }
-                        for (var k in controller)
-                            if (k.startsWith("event:") && !script["$" + k.substring(6)]) {
-                                script["$" + k.substring(6)] = function () { }; //Empty event
-                            }
                         template.$api = API;
                         template.$c = script;
 
@@ -440,6 +430,18 @@
 
                         var values = template.$api.values;
                         template.$api.parent = ext.parent; //TODO: Not here, thsi is shared between renderings of same template
+                        template.$api.context = ext;
+
+                        // Event mirror and attribute hook
+                        // TODO MOVE TO $init (now needs the ext instance)
+                        for (var k in values)
+                            if (k.startsWith("event:")) {
+                                var name = k.substring(6);
+                                template.$c["$" + name] = eventProxy(values["event:" + name], name, ext);
+                            }
+                        for (var k in controller)
+                            if (k.startsWith("event:") && !template.$c["$" + k.substring(6)])
+                                template.$c["$" + k.substring(6)] = function () { }; //Empty event (avoid errors)
 
                         ext.getChildNodes = template.$api.childs;
                         ext.customController = template.$c;
