@@ -231,7 +231,9 @@
          */
         function loadLibrary(path) {
             UI.fetchFragment(path, dom => {
-                UI.readTemplate(dom);
+                UI.readTemplate(dom, null, {
+
+                });
             });
         }
 
@@ -273,7 +275,7 @@
              * @param {*} ext ctor extended info
              */
             function renderControlDOM(ext) {
-                var tux = ext.customController.render();
+                var tux = ext.customController.build();
                 if (!tux)
                     return [];
                 if (!Array.isArray(tux))
@@ -380,12 +382,7 @@
                     controller.$init = function (template) {
                         if (template.$ && template.$.length && !allowChildren)
                             throw new Error("wolf:" + id + " does not allow child nodes");
-                    };
 
-                    controller.$ctor = function (template, ext) {
-                        var parentCustom = ext.customController;
-                        ext = {}.merge(ext); //Copy of ext instance
-                        // Initialize attributes and script
                         var values = getControlAttributesTable(controller, template);
                         var API = {
                             ui: (name, clone) => {
@@ -404,19 +401,19 @@
                                     return data;
                                 return null;
                             },
-                            childs: name => ext.getChildNodes(name),
+                            childs: name => {
+                                //ID for usage on future with multiple chilnodes block definitions
+                                return template.$;
+                            },
                             global: controlGlobal,
-                            parent: ext.parent,
                             values: values,
                         }
                         var script = scriptFactory ? new scriptFactory(API, K, D, UI, TOOLS) : {};
                         API.controller = script;
                         API.instanceTemplate = (templ, ext2) => UI.instanceTemplate(templ, ext2 ? ext2 : { parent: ext.parent, customController: script })
-                        if (!script.render)
-                            script.render = () => {
-                                for (var k in ui)//return first if any
-                                    return ui[k];
-                                throw new Error("wolf:" + id + " does not have ui defined");
+                        if (!script.build)
+                            script.build = () => {
+                                return ui[""];
                             }
 
                         // Event mirror and attribute hook
@@ -429,12 +426,23 @@
                             if (k.startsWith("event:") && !script["$" + k.substring(6)]) {
                                 script["$" + k.substring(6)] = function () { }; //Empty event
                             }
+                        template.$api = API;
+                        template.$c = script;
 
-                        ext.getChildNodes = function (id) {
-                            //ID for usage on future with multiple chilnodes block definitions
-                            return template.$;
-                        }
-                        ext.customController = script;
+                        //TODO: Create control defined custom properties for attributes that change the attribute values
+                        script.init && script.init();
+                    };
+
+                    controller.$ctor = function (template, ext) {
+                        var parentCustom = ext.customController;
+                        ext = {}.merge(ext); //Copy of ext instance
+                        // Initialize attributes and script
+
+                        var values = template.$api.values;
+                        template.$api.parent = ext.parent; //TODO: Not here, thsi is shared between renderings of same template
+
+                        ext.getChildNodes = template.$api.childs;
+                        ext.customController = template.$c;
                         ext.parentCustom = parentCustom;
                         //TODO: Replace with a local binding (bindings to values object only, creating a local model only for this control)
                         //      - access this local binding with {$name}
@@ -467,9 +475,6 @@
                                 }
                             }
                         }
-                        //TODO: Create control defined custom properties for attributes that change the attribute values
-                        script.init && script.init();
-
                         // Generate DOM
                         return renderControlDOM(ext);
                     };

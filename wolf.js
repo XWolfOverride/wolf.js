@@ -751,9 +751,39 @@ var wolf = (() => {
         /**
          * Template class
          */
-        function Template() {
-
+        function Template(type, attributes, childs) {
+            if (type)
+                this.$t = type;
+            if (attributes)
+                this.merge(attributes);
+            if (childs)
+                if (type) {
+                    if (childs.push)
+                        this.$ = childs;
+                    else
+                        this.$ = [childs];
+                } else
+                    this.$ = childs;
         }
+
+        Object.defineProperty(Template.prototype, "$set", {
+            value: function (attributeName, attributeValue) {
+                this[attributeName] = attributeValue;
+                return this;
+            }
+        });
+
+        Object.defineProperty(Template.prototype, "$add", {
+            value: function (child) {
+                if (this.$t) {
+                    if (!this.$)
+                        this.$ = [];
+                    this.$.push(child);
+                } else
+                    this.$ = child;
+                return this;
+            }
+        });
 
         /** Initializes an application, an application is only a definition of the container element in the document
          * and the url of the application controller, a single web page can contains several applications
@@ -834,7 +864,7 @@ var wolf = (() => {
                         throw new Error("wolf:repeat requires a child");
                 },
                 $ctor: template => {
-                    var hook = document.createElement(template.$[0].type);
+                    var hook = document.createElement(template.$[0].$t);
                     setTimeout(() => {
                         template.items.bindRepeater(hook.parentElement, hook.nextSibling, template.$);
                         hook.parentElement.removeChild(hook);//Clear hook
@@ -876,11 +906,7 @@ var wolf = (() => {
                         if (!(items instanceof D.Binding))
                             throw new Error("Only bindings can be used on xwolf:repeat");
                         delete template.repeat;
-                        return {
-                            $t: "wolf:repeat",
-                            items: items,
-                            $: [template]
-                        };
+                        return new Template("wolf:repeat", { $w: wolfElements.repeat, items: items }, template);
                     }
                 },
 
@@ -1049,7 +1075,7 @@ var wolf = (() => {
                 if (path && path[0] == '/')
                     return path;
                 var base;
-                if (template.type == "#app" || (contextPath && contextPath[0] == "/"))
+                if (template.$t == "#app" || (contextPath && contextPath[0] == "/"))
                     base = contextPath;
                 else {
                     base = element.getParent().getContextPath();
@@ -1210,17 +1236,26 @@ var wolf = (() => {
         }
         /**
          * Process an element template and it's childs, preparing the logics and binding maps
-         * @param {element} element 
+         * @param {*} node DOM node to read as template
+         * @param {*} parent parent template
+         * @param {*} tcontext template processing context (extended api for reading)
+         * @param {funciton} tcontext.readValue function for checking the value for templates
          */
-        function readTemplate(node, parent) {
+        function readTemplate(node, parent, tcontext) {
             /**
              * @callback readTemplate_callback
              * @param {*} template template processed completely
              */
 
             var templ = new Template(), initiators = [];
+            tcontext = tcontext || {};;
 
             function valOrBinding(val) {
+                if (tcontext.readValue) {
+                    var v = tcontext.readValue(val);
+                    if (v)
+                        return v;
+                }
                 if (typeof val === "string" && val.indexOf('{') >= 0)
                     return new D.Binding(val);
                 return val;
@@ -1257,6 +1292,8 @@ var wolf = (() => {
                         var aval = valOrBinding(node.getAttribute(attr));
                         if ((aval instanceof D.Binding) && !attri.bindable)
                             throw new Error(tagname + " attribute " + attr + " can not be binded");
+                        if (!(aval instanceof D.Binding) && attri.bindable == "mandatory")
+                            throw new Error(tagname + " attribute " + attr + " should be binded");
                         templ[attr] = aval;
                     });
                     for (var k in wdef) {
@@ -1727,7 +1764,7 @@ var wolf = (() => {
                     result[i] = cloneTemplate(templ[i]);
                 return result;
             }
-            var clone = {}.merge(templ);
+            var clone = new Template().merge(templ);
 
             // Does not clone events??
             delete clone.$e;
@@ -1771,6 +1808,7 @@ var wolf = (() => {
             cloneTemplate: cloneTemplate,
             // queryTemplate: queryTemplate, DRAFT
             // hackTemplate: hackTemplate, DRAFT
+            Template: Template,
         }
     })();
 
