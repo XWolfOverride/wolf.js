@@ -36,14 +36,14 @@
             var onClose; //Callback for on close
             // Process modaling
             if (modal) {
-                modalWall = UI.instanceTemplate({ type: "div", a: { "class": "wolf-dialog-modal-wall" }, w: {} }, { parent: element })[0];
+                modalWall = UI.instanceTemplate(new UI.Template("div", { "class": "wolf-dialog-modal-wall", $controller: controller }), { parent: element })[0];
                 element.appendChild(modalWall);
                 base = modalWall;
             } else
                 base = element;
 
             // Create dialog frame
-            var dialog = UI.instanceTemplate({ type: "div", a: { "class": "wolf-dialog" }, w: {}, controller: controller }, { parent: base })[0];
+            var dialog = UI.instanceTemplate(new UI.Template("div", { "class": "wolf-dialog", $controller: controller }), { parent: base })[0];
             base.appendChild(dialog);
 
             dialog.close = function () {
@@ -59,7 +59,7 @@
              */
             function append(ui) {
                 if (!body) {
-                    body = UI.instanceTemplate({ type: "div", a: { "class": "wolf-dialog-body" }, w: {} }, { parent: dialog })[0];
+                    body = UI.instanceTemplate(new UI.Template("div", { "class": "wolf-dialog-body" }), { parent: dialog })[0];
                     if (buttons)
                         body.classList.add("with-footer");
                     dialog.appendChild(body);
@@ -84,7 +84,7 @@
                 if (body)
                     body.classList.add("with-footer");
                 if (!buttons) {
-                    buttons = UI.instanceTemplate({ type: "div", a: { "class": "wolf-dialog-buttons" }, w: {} }, { parent: dialog })[0];
+                    buttons = UI.instanceTemplate(new UI.Template("div", { "class": "wolf-dialog-buttons" }), { parent: dialog })[0];
                     dialog.appendChild(buttons);
                 }
                 if (!Array.isArray(buttonsDef))
@@ -98,16 +98,21 @@
                             var def = uidef[k];
                             if (!def)
                                 continue; //def can be null in order to cancel a button in json strucutres
-                            var btcontent = [];
-                            if (def.icon)
-                                btcontent.push({ type: "i", a: { class: "icon" + (def.text ? " with-text" : "") }, w: {}, c: [{ value: def.icon }] });
-                            if (def.text)
-                                btcontent.push({ value: def.text });
-                            var button = UI.instanceTemplate({ type: "button", a: {}, w: {}, c: btcontent }, { parent: dialog })[0];
-                            if (def.default)
-                                button.classList.add("default");
-                            if (def.cancel)
-                                button.classList.add("cancel");
+                            var button;
+                            if (def.t)
+                                button = UI.instanceTemplate(def.t, { parent: dialog })[0];
+                            else {
+                                var btcontent = [];
+                                if (def.icon)
+                                    btcontent.push(new UI.Template("i", { class: "icon" + (def.text ? " with-text" : "") }, { value: def.icon }));
+                                if (def.text)
+                                    btcontent.push({ value: def.text });
+                                button = UI.instanceTemplate(new Template("button", null, btcontent), { parent: dialog })[0];
+                                if (def.default)
+                                    button.classList.add("default");
+                                if (def.cancel)
+                                    button.classList.add("cancel");
+                            }
                             installEvent(button, k, def);
                             buttons.appendChild(button);
                         }
