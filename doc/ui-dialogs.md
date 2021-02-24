@@ -2,7 +2,7 @@
 
 wolf.ui extension add capacity for pop-up dialogs in an easy way.
 
-the extensionadds the next tree dialogs functions to wolf.js object:
+the extensionadds the next three dialogs functions to wolf.js object:
 - wolf.dialog, to load a dialog out of an html file.
 - wolf.messaeDialog, to show simple message dialgs.
 - wolf.uiDialog, to create dialogs out of wolf.js UI templates (need knowledge about wolf.js UI templates).
@@ -15,7 +15,7 @@ All dialogs on the library uses a very similar way of usage:
 
 - app-element is the parent element of the dialog, the root node of the aplication is recommended, but can be any node.
 - modal, boolean defining if the dialog is modal.
-- dialog-data, dialog usage specific data, this type and maning depends on the dialog method used. See bottom sections.
+- dialog-data, dialog usage specific data, this type and meaning depends on the dialog method used. See bottom sections.
 - buttons-definition, optional but recommended, a definition of the buttons shown in the footer of the application.
 - controller, controller object used to catch elements events, recommended, if not defined app-element controller will be used instead (except buttons-definitnion).
 - creation-callback, callback to be executed once the dialog is ready and on screen, the dialog element is passed as parameter.

@@ -45,7 +45,8 @@ var wolf = (() => {
     var K = (() => {
         var objs = {}; //Map of objects by url
         var configuration = {
-            trimTextNodes: true,
+            trimTextNodes: true, //Trim emtpy text nodes between elements
+            autoWriteBinding: false, //Install the write procedure on binded inputs
         };
 
         /**
@@ -395,7 +396,7 @@ var wolf = (() => {
                 var procName = part.substr(1);
                 var fmt = processors[procName];
                 if (fmt)
-                    fmt(pdata, value, context);
+                    fmt(pdata, context, value);
                 else
                     throw new Error("Processor '" + procName + "' not found on set.");
             } else
@@ -576,9 +577,8 @@ var wolf = (() => {
              * Executes the binding and return the value 
              * @param {*} [context] additional data
              * @param {element} [context.element] DOM element of data processed when calling from binding
-             * @param {string} [type] type of field if "string" undefined values will be returned as ""
              */
-            function read(context, type) {
+            function read(context) {
                 var value;
                 var contextPath = context.element.getContextPath;
                 for (var i in parts) {
@@ -593,8 +593,6 @@ var wolf = (() => {
                     else if (v !== undefined)// If v is undefined no concatenation is done at all
                         value = String(value) + v;
                 }
-                if (type === "string" && (value === undefined || value === null))
-                    value = "";
                 return value;
             }
 
@@ -631,7 +629,10 @@ var wolf = (() => {
                     node: textNode,
                     read: null,
                     write: function () {
-                        textNode.nodeValue = read({ element: textNode }, "string");
+                        var value = read({ element: textNode });
+                        if (value === undefined || value === null)
+                            value = "";
+                        textNode.nodeValue = value;
                     }
                 });
             }
@@ -648,7 +649,11 @@ var wolf = (() => {
                         node: element,
                         read: null,
                         write: function () {
-                            element.setAttribute(attribute, read({ element: element }, "string"));
+                            var value = read({ element: element });
+                            if (value === undefined || value === null || value === false)
+                                element.removeAttribute(attribute);
+                            else
+                                element.setAttribute(attribute, value);
                         }
                     }
                 }
@@ -720,11 +725,19 @@ var wolf = (() => {
             }
 
             /**
-             * Return the actual value reflected bi the binding for the specified element
+             * Return the actual value reflected by the binding for the specified element
              * @param {*} element DOM element
              */
             function getValue(element) {
                 return read({ element: element })
+            }
+
+            /**
+             * Return the actual value reflected by the binding for the specified element
+             * @param {*} element DOM element
+             */
+            function getParts() {
+                return parts;
             }
 
             this.bindTextNode = bindTextNode;
@@ -732,6 +745,7 @@ var wolf = (() => {
             this.bindRepeater = bindRepeater;
             this.bindExecutor = bindExecutor;
             this.getValue = getValue;
+            this.getParts = getParts;
         }
 
         return {
@@ -929,6 +943,62 @@ var wolf = (() => {
                     bindable: false,
                     initTemplate: (template, value) => {
                         template.$id = value;
+                    }
+                },
+
+                /**
+                 * wolf:write
+                 * for data write logic definition
+                 */
+
+                "write": {
+                    bindable: false,
+                    processor: function (element, value, template, auto) {
+                        if (value == "none")
+                            return;
+                        if (!value) {
+                            if (template.$t == "input") {
+                                var type = template.type;
+                                if (type instanceof D.Binding)
+                                    type = type.getValue(element);
+                                var path = template.value;
+                                if (!(path instanceof D.Binding)) {
+                                    if (!auto)
+                                        console.warn("A binding is needed to autodetect write path");
+                                    return;
+                                }
+                                path = path.getParts();
+                                if (path.length != 1 || !path[0].bind) {
+                                    console.warn("A complex binding can not be used to autodetect write path");
+                                    return;
+                                }
+                                path = path[0].path;
+                                switch (type) {
+                                    case "checkbox":
+                                    case "radio":
+                                        value = ["click", path, "checked"]
+                                        break;
+                                    default:
+                                        value = ["change", path, "value"]
+                                }
+                            } else {
+                                if (!auto)
+                                    console.warn("Can not autodetect write method for element ", element);
+                                return;
+                            }
+                        } else
+                            value = value.split(':');
+                        if (value.length <= 2)
+                            value = ["change", value[0], value[1] || "value"];
+                        element.addEventListener(value[0], evt => {
+                            var ctx = { event: evt };
+                            var obj;
+                            if (value[1] && value[1][0] == '/')
+                                obj = D.getModel().getProperty();
+                            else
+                                obj = element.getContextData();
+                            D.setProperty(obj, value[1], D.getProperty(element, value[2], ctx), ctx);
+                        });
                     }
                 }
             }
@@ -1170,6 +1240,10 @@ var wolf = (() => {
                     else
                         element.setAttribute(k, value);
                 }
+                // install write events prior to install events
+                if (K.configuration.autoWriteBinding)
+                    if (!template["wolf:write"]) //TODO: adjust wolf attributes on framework
+                        wolfAttributes.write.processor(element, null, template, true);
                 // process events
                 function installEvent(event, method) {
                     if (customController)

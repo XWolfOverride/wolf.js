@@ -460,7 +460,7 @@
                                     data.bindExecutor(element,
                                         null,
                                         null,
-                                        read => element.nodeValue = read({ element: element }, "string")
+                                        read => element.nodeValue = read({ element: element })
                                     );
                                 else
                                     element.nodeValue = data;
@@ -475,7 +475,7 @@
                                         data.bindExecutor(element,
                                             null,
                                             null,
-                                            read => element.setAttribute(k, read({ element: element }, "string"))
+                                            read => element.setAttribute(k, read({ element: element }))
                                         );
                                     else
                                         element.setAttribute(k, data);
