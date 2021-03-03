@@ -55,8 +55,9 @@ var wolf = (() => {
          * passed prior to the object initialization function.
          * @param {object} objd object definition
          * @param {function} [callback] callback to be called once the object has been loaded
+         * @param {string} url url of instantiated code
          */
-        function instantiate(objd, callback) {
+        function instantiate(objd, callback, url) {
             var deps = {};
             var constructor;
             // ==== Process arguments
@@ -95,8 +96,13 @@ var wolf = (() => {
                     checkFinish();
                 }
             }
+            function loadDependency(name) {
+                require(name, checkFactory(name), error => {
+                    console.error("Error loading module '" + url + "', can not load dependency '" + name + "'.");
+                });
+            }
             for (var i in deps)
-                require(i, checkFactory(i));
+                loadDependency(i);
             checkFinish();
         }
 
@@ -106,18 +112,26 @@ var wolf = (() => {
          * @param {function} [callback] callback to be called once the object has been loaded
          * @param {fetcher_callfail} [callfail] callback to be called once the object has been loaded
          */
-        function require(url, callback) {
+        function require(url, callback, callfail) {
             if (!url)
                 return;
             url = new URL(url, document.baseURI).href;
             var obj = objs[url];
             if (!obj) {
                 TOOLS.wGet(url, data => {
-                    var inc = Function(`'use strict';return ${data};\n//# sourceURL=${url}`);
+                    try {
+                        var inc = Function(`'use strict';return ${data};\n//# sourceURL=${url}`);
+                    } catch (e) {
+                        throw new Error("Error in module '" + url + "' parsing file: " + e.message);
+                    }
                     instantiate(inc(), (lobj) => {
                         objs[url] = lobj;
                         callback && callback(lobj);
-                    });
+                    }, url);
+                }, (error, stage) => {
+                    if (error && error.status && error.status == 404)
+                        console.error("Error loading module '" + url + "', not found on server.");
+                    callfail && callfail(error, stage)
                 });
             } else
                 callback && callback(obj);
@@ -830,6 +844,10 @@ var wolf = (() => {
                         template.$controller = template.controller;
                         delete template.controller;
                     }
+                    if (template.forcecontroller) {
+                        template.$forcecontroller = template.forcecontroller == "true";
+                        delete template.forcecontroller;
+                    }
                     /**
                      * Inserts the element into a parent element (replacing any content)
                      * @param {element} parentElement 
@@ -842,7 +860,7 @@ var wolf = (() => {
                             parentElement.appendChild(nodes[i]);
                         var ptmpl = parentElement.getTemplate();
                         if (template.$controller)
-                            if (!ptmpl.$controller || ptmpl.$fragmentedController) {
+                            if (!ptmpl.$controller || ptmpl.$fragmentedController || template.$forcecontroller) {
                                 ptmpl.$controller = template.$controller;
                                 ptmpl.$fragmentedController = true;
                             } else {
@@ -860,6 +878,9 @@ var wolf = (() => {
                     bindable: false
                 },
                 controller: {
+                    bindable: false
+                },
+                forcecontroller: {
                     bindable: false
                 }
             },
@@ -1626,35 +1647,55 @@ var wolf = (() => {
                     throw new Error(`Navigation "${id}" not defined.`)
                 current = { id: id, data: data };
                 var lh = new K.LoadHandler(() => {
-                    if (navEntry.event) {
-                        var eventName = navEntry.event;
-                        var ctrl;
-                        if (eventName[0] == '/') {
-                            eventName = eventName.substr(1);
-                            ctrl = lh.__elem.getApplicationController();
-                        } else
-                            ctrl = lh.__elem.getController();
-                        if (ctrl[eventName])
-                            ctrl[eventName](lh.__elem, id, data);
-                    }
+                    if (navEntry.event)
+                        callEvent(lh.__elem, navEntry.event);
                     for (var i in nav.onChange) try {
                         nav.onChange[i](id, data);
                     } catch { };
                 });
 
-                if (navEntry.set) {
-                    for (var k in navEntry.set) {
-                        var dest = navEntry.set[k];
+                function callEvent(element, eventName) {
+                    var ctrl;
+                    if (eventName[0] == '/') {
+                        eventName = eventName.substr(1);
+                        ctrl = element.getApplicationController();
+                    } else
+                        ctrl = element.getController();
+                    if (ctrl[eventName])
+                        ctrl[eventName](lh.__elem, id, data);
+                    else
+                        console.error("Navigation event '" + eventName + "' doest not exists");
+                }
+
+                function navFragment(dest, elem) {
+                    lh.enter();
+                    loadFragmentTo(dest.to, elem, (templ, setElem) => {
+                        lh.__elem = lh.__elem || setElem;
+                        if (dest.then)
+                            processSet(dest.then);
+                        if (dest.event)
+                            callEvent(setElem, dest.event);
+                        lh.leave();
+                    });
+                }
+
+                function processSet(navset) {
+                    for (var k in navset) {
+                        var dest = navset[k];
                         var elem = element.byId(k);
-                        if (elem) {
-                            lh.enter();
-                            loadFragmentTo(dest, elem, (templ, setElem) => {
-                                lh.__elem = setElem;
-                                lh.leave();
-                            });
-                        }
+                        if (typeof dest === "string")
+                            dest = { to: dest };
+                        if (elem)
+                            navFragment(dest, elem);
+                        else
+                            console.error("Navigation '" + id + "' not completed, element with id '" + k + "' not found")
                     }
-                } else { lh.clear(); }
+                }
+
+                if (navEntry.set)
+                    processSet(navEntry.set)
+                else
+                    lh.clear();
             }
 
             /**
@@ -1914,8 +1955,12 @@ var wolf = (() => {
             function fail(error, stage) {
                 if (callfail)
                     callfail(error, stage);
-                else
-                    console.error(error, stage);
+                else {
+                    if (error && error.status && error.status == 404)
+                        console.error("Error loading '" + url + "', not found");
+                    else
+                        console.error(error, stage);
+                }
             }
             if (!url) {
                 fail(new Error("Missing url"), "init");
