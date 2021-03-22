@@ -106,8 +106,10 @@
                                 if (def.icon)
                                     btcontent.push(new UI.Template("i", { class: "icon" + (def.text ? " with-text" : "") }, { value: def.icon }));
                                 if (def.text)
-                                    btcontent.push({ value: def.text });
-                                button = UI.instanceTemplate(new Template("button", null, btcontent), { parent: dialog })[0];
+                                    btcontent.push(new UI.Template(null, null, def.text));
+                                button = UI.instanceTemplate(new UI.Template("button", null, btcontent), { parent: dialog })[0];
+                                if (def.class)
+                                    button.className = def.class;
                                 if (def.default)
                                     button.classList.add("default");
                                 if (def.cancel)
@@ -209,7 +211,7 @@
         function messageDialog(element, modal, text, buttons, controller, callback, onclose) {
             if (!buttons)
                 buttons = { close: { icon: "close", cancel: true } };
-            uiDialog({ value: text }, buttons, element, modal, controller, callback, onclose)
+            uiDialog(new UI.Template(null, null, text), buttons, element, modal, controller, callback, onclose)
         }
 
         /**

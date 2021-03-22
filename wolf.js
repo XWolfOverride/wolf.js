@@ -98,7 +98,8 @@ var wolf = (() => {
             }
             function loadDependency(name) {
                 require(name, checkFactory(name), error => {
-                    console.error("Error loading module '" + url + "', can not load dependency '" + name + "'.");
+                    var err = error && error.stack ? error.stack : error;
+                    console.error("Error loading module '" + url + "', can not load dependency '" + name + "': " + err);
                 });
             }
             for (var i in deps)
@@ -562,7 +563,7 @@ var wolf = (() => {
                     if (insideBind) {
                         if (ch == '}') {
                             insideBind = false;
-                            if (value)
+                            //if (value) //binding with {} means this
                                 bindingParts.push({ bind: true, path: value });
                             value = "";
                         } else
