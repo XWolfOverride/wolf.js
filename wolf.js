@@ -23,8 +23,29 @@
  * @typedef {object} element DOM element node
  */
 
-var wolf = (() => {
+var wolf = (function () {
     'use strict';
+
+    // ==== PolyFills (IE 11 support) ====
+    function checkPolyFills() {
+        if (typeof window["URL"] !== 'function')
+            UI.import("https://cdn.polyfill.io/v2/polyfill.min.js","js");
+
+        if (typeof window["Promise"] !== 'function')
+            UI.import("https://cdn.jsdelivr.net/npm/promise-polyfill@8.1.3/dist/polyfill.min.js","js");
+
+        if (typeof window["fetch"] !== 'function')
+            UI.import("https://cdn.jsdelivr.net/npm/whatwg-fetch@3.4.0/dist/fetch.umd.min.js","js");
+
+        if (!Element.prototype.getAttributeNames) {
+            Element.prototype.getAttributeNames = function () {
+                var result = [];
+                for (var i = 0; i < this.attributes.length; i++)
+                    result.push(this.attributes[i].name);
+                return result;
+            }
+        }
+    }
 
     // ==== Global tools ==== 
     if (!Object.prototype.merge)
@@ -39,10 +60,10 @@ var wolf = (() => {
             }
         });
 
-    window.byId = id => document.getElementById(id);
+    window.byId = function (id) { document.getElementById(id) };
 
     // ==== Kernel ==== resources loading, initializaiton and process handling
-    var K = (() => {
+    var K = (function () {
         var objs = {}; //Map of objects by url
         var configuration = {
             trimTextNodes: true, //Trim emtpy text nodes between elements
@@ -91,13 +112,13 @@ var wolf = (() => {
                 callback && callback(obj);
             }
             function checkFactory(name) { //Function factory, a way to isaolate parameter value by scope
-                return (obj) => {
+                return function (obj) {
                     deps[name] = obj;
                     checkFinish();
                 }
             }
             function loadDependency(name) {
-                require(name, checkFactory(name), error => {
+                require(name, checkFactory(name), function (error) {
                     var err = error && error.stack ? error.stack : error;
                     console.error("Error loading module '" + url + "', can not load dependency '" + name + "': " + err);
                 });
@@ -119,17 +140,17 @@ var wolf = (() => {
             url = new URL(url, document.baseURI).href;
             var obj = objs[url];
             if (!obj) {
-                TOOLS.wGet(url, data => {
+                TOOLS.wGet(url, function (data) {
                     try {
-                        var inc = Function(`'use strict';return ${data};\n//# sourceURL=${url}`);
+                        var inc = Function("'use strict';return " + data + ";\n//# sourceURL=" + url);
                     } catch (e) {
                         throw new Error("Error in module '" + url + "' parsing file: " + e.message);
                     }
-                    instantiate(inc(), (lobj) => {
+                    instantiate(inc(), function (lobj) {
                         objs[url] = lobj;
                         callback && callback(lobj);
                     }, url);
-                }, (error, stage) => {
+                }, function (error, stage) {
                     if (error && error.status && error.status == 404)
                         console.error("Error loading module '" + url + "', not found on server.");
                     callfail && callfail(error, stage)
@@ -280,7 +301,7 @@ var wolf = (() => {
                     }
                     check();
                 }
-                setTimeout(() => {
+                setTimeout(function () {
                     try {
                         resolver(resolve, reject);
                     } catch (err) {
@@ -314,7 +335,7 @@ var wolf = (() => {
     })();
 
     // ==== Data === data model and binding
-    var D = (() => {
+    var D = (function () {
         var processors = {};
         var model = { "": new Model() };
 
@@ -350,7 +371,7 @@ var wolf = (() => {
                     var procPars = null;
                     if (procName.indexOf('(') >= 0) {
                         if (procName[procName.length - 1] != ')')
-                            throw new Error(`Malformed processor call "${procName}"`);
+                            throw new Error("Malformed processor call \"" + procName + "\"");
                         var pstart = procName.indexOf('(');
                         procPars = procName.substring(pstart + 1, procName.length - 1);
                         procName = procName.substring(0, pstart);
@@ -516,7 +537,7 @@ var wolf = (() => {
              */
             function refreshModelElement(element) {
                 for (var p in bindings) {
-                    bindings[p].forEach(bindEx => {
+                    bindings[p].forEach(function (bindEx) {
                         if (element.contains(bindEx.node) && bindEx.write)
                             bindEx.write();
                     });
@@ -546,7 +567,7 @@ var wolf = (() => {
             this.refresh = refreshModelPath;
             this.refreshElement = refreshModelElement;
             this.registerBindingExecutor = registerBindingExecutor;
-            this.getBindings = () => { return bindings; };
+            this.getBindings = function () { return bindings; };
         }
 
         /**
@@ -558,27 +579,29 @@ var wolf = (() => {
                 var bindingParts = [];
                 var value = "";
                 var insideBind = false;
-                for (var i in path) {
-                    var ch = path[i];
-                    if (insideBind) {
-                        if (ch == '}') {
-                            insideBind = false;
-                            //if (value) //binding with {} means this
+                Array.prototype.forEach.call(
+                    path,
+                    function (ch) {
+                        if (insideBind) {
+                            if (ch == '}') {
+                                insideBind = false;
+                                //if (value) //binding with {} means "this"
                                 bindingParts.push({ bind: true, path: value });
-                            value = "";
-                        } else
-                            value += ch;
-                    } else {
-                        if (ch == '{') {
-                            if (value)
-                                bindingParts.push({ bind: false, value: value });
-                            insideBind = true;
-                            value = "";
+                                value = "";
+                            } else
+                                value += ch;
                         } else {
-                            value += ch;
+                            if (ch == '{') {
+                                if (value)
+                                    bindingParts.push({ bind: false, value: value });
+                                insideBind = true;
+                                value = "";
+                            } else {
+                                value += ch;
+                            }
                         }
                     }
-                }
+                );
                 if (insideBind)
                     throw new Error("Not closed binding.");
                 if (value)
@@ -695,14 +718,14 @@ var wolf = (() => {
                     pathbar += '/';
                 //v0.1 delete all and refill
                 function populate(data) {
-                    repeatItems.forEach(item => { try { parent.removeChild(item) } catch { } });
+                    repeatItems.forEach(function (item) { try { parent.removeChild(item); } catch (e) { } });
                     repeatItems = []
                     if (!data)
                         return;
                     for (var k in data) {
-                        templates.forEach(templ => {
+                        templates.forEach(function (templ) {
                             var elements = UI.instanceTemplate(templ, { parent: parent, contextPath: pathbar + k });
-                            elements.forEach(element => {
+                            elements.forEach(function (element) {
                                 repeatItems.push(element);
                                 parent.insertBefore(element, sibling);
                             });
@@ -727,7 +750,7 @@ var wolf = (() => {
              */
             function bindExecutor(node, fninit, fnread, fnwrite) {
                 var fread;
-                var fwrite = fnwrite ? () => {
+                var fwrite = fnwrite ? function () {
                     fnwrite(read);
                 } : null;
                 if (fninit)
@@ -774,7 +797,7 @@ var wolf = (() => {
     })()
 
     // ==== UI ==== screen elements and applications handling
-    var UI = (() => {
+    var UI = (function () {
         var frgs = {}, navigatorController;
 
         /**
@@ -820,7 +843,7 @@ var wolf = (() => {
          * @param {element} element the parent document element
          */
         function initApp(ctrlUrl, element) {
-            K.require(ctrlUrl, (ctrl) => {
+            K.require(ctrlUrl, function (ctrl) {
                 processElement(element, {
                     $t: "#app",
                     $controller: ctrl
@@ -836,7 +859,7 @@ var wolf = (() => {
              * fragment definition, fragment can be loaded from urls and can have a cotnroller that is propagated on all childs
              */
             "fragment": {
-                $init: template => {
+                $init: function (template) {
                     if (template.id) {
                         frgs["#" + template.id] = template;
                         delete template.id;
@@ -870,9 +893,9 @@ var wolf = (() => {
                         template.$controller && template.$controller.init && template.$controller.init(parentElement);
                     }
                 },
-                $ctor: (template, ext) => {
+                $ctor: function (template, ext) {
                     var nodes = [];
-                    template.$ && template.$.forEach(son => instanceTemplate(son, ext).forEach(sonDOM => nodes.push(sonDOM)));
+                    template.$ && template.$.forEach(function (son) { instanceTemplate(son, ext).forEach(function (sonDOM) { nodes.push(sonDOM) }) });
                     return nodes;
                 },
                 id: {
@@ -891,7 +914,7 @@ var wolf = (() => {
              * repeat all child elements, also adgust the context data for each repetition
              */
             "repeat": {
-                $init: template => {
+                $init: function (template) {
                     if (!template.items)
                         throw new Error("item attribute is mandatory on wolf:repeat");
                     if (!(template.items instanceof D.Binding))
@@ -899,9 +922,9 @@ var wolf = (() => {
                     if (!template.$ || template.$.length == 0)
                         throw new Error("wolf:repeat requires a child");
                 },
-                $ctor: template => {
+                $ctor: function (template) {
                     var hook = document.createElement(template.$[0].$t);
-                    setTimeout(() => {
+                    setTimeout(function () {
                         template.items.bindRepeater(hook.parentElement, hook.nextSibling, template.$);
                         hook.parentElement.removeChild(hook);//Clear hook
                     });
@@ -919,7 +942,7 @@ var wolf = (() => {
          *  for extended processors with multiple options (for example events) use a # before the
          *  processor name (see event processor)
          */
-        var wolfAttributes = (() => {
+        var wolfAttributes = (function () {
             return {
                 /**
                  * wolf:include
@@ -938,10 +961,9 @@ var wolf = (() => {
                  */
                 "repeat": {
                     bindable: true,
-                    initTemplate: (template, items) => {
+                    initTemplate: function (template, items) {
                         if (!(items instanceof D.Binding))
                             throw new Error("Only bindings can be used on xwolf:repeat");
-                        delete template.repeat;
                         return new Template("wolf:repeat", { $w: wolfElements.repeat, items: items }, template);
                     }
                 },
@@ -963,7 +985,7 @@ var wolf = (() => {
                  */
                 "id": {
                     bindable: false,
-                    initTemplate: (template, value) => {
+                    initTemplate: function (template, value) {
                         template.$id = value;
                     }
                 },
@@ -1012,7 +1034,7 @@ var wolf = (() => {
                             value = value.split(':');
                         if (value.length <= 2)
                             value = ["change", value[0], value[1] || "value"];
-                        element.addEventListener(value[0], evt => {
+                        element.addEventListener(value[0], function (evt) {
                             var ctx = { event: evt };
                             var obj;
                             if (value[1] && value[1][0] == '/')
@@ -1055,8 +1077,8 @@ var wolf = (() => {
                         throw new Error("Intermediate controllers not supported right now");
                         // // NOTE: Not optimal, but intermediate controllers are not optimal too.
                         // return await Promise.resolve({
-                        //     then: (ok, ko) => {
-                        //         K.require(template.$controller, ctrl => {
+                        //     then: function(ok, ko)  {
+                        //         K.require(template.$controller, function(ctrl) {
                         //             ok(template.$controller = ctrl);
                         //         });
                         //     }
@@ -1269,18 +1291,18 @@ var wolf = (() => {
                 // process events
                 function installEvent(event, method) {
                     if (customController)
-                        element.addEventListener(event, (evt) => {
+                        element.addEventListener(event, function (evt) {
                             var evtMethod = customController[method];
                             if (!evtMethod)
-                                throw new Error(`Method '${method}' not found for event '${k}' in custom controller.`);
+                                throw new Error("Method '" + method + "' not found for event '" + k + "' in custom controller.");
                             evtMethod(element, evt);
                         });
                     else
-                        element.addEventListener(event, (evt) => {
+                        element.addEventListener(event, function (evt) {
                             var ctrl = element.getController();
                             var evtMethod = ctrl[method];
                             if (!evtMethod)
-                                throw new Error(`Method '${method}' not found for event '${k}'.`);
+                                throw new Error("Method '" + method + "' not found for event '" + k + "'.");
                             evtMethod(element, evt);
                         });
                 }
@@ -1303,7 +1325,7 @@ var wolf = (() => {
         function instanceTemplate(template, ext) {
             if (Array.isArray(template)) {
                 var result = [];
-                template.forEach(templ => {
+                template.forEach(function (templ) {
                     result = result.concat(instanceTemplate(templ, ext));
                 });
                 return result;
@@ -1324,7 +1346,7 @@ var wolf = (() => {
                 if (template.$ && template.$.length) {
                     var childExt = {}.merge(ext).merge({ parent: node });
                     delete childExt.contextPath; //TODO: erase the usage of contextPath in ext, or do not cache contextpath when initTemplate is done
-                    template.$.forEach(son => instanceTemplate(son, childExt).forEach(sonDOM => node.appendChild(sonDOM)));
+                    template.$.forEach(function (son) { instanceTemplate(son, childExt).forEach(function (sonDOM) { node.appendChild(sonDOM) }) });
                 }
                 template.$onRender && template.$onRender(node, template, ext); //TODO: refactor postInit to $onRender
                 return [node];
@@ -1378,7 +1400,7 @@ var wolf = (() => {
                     var wdef = templ.$w = wolfElements[tagname.substr(5)];
                     if (!wdef)
                         throw new Error("Unknown element: " + tagname);
-                    node.getAttributeNames().forEach(attr => {
+                    node.getAttributeNames().forEach(function (attr) {
                         if (attr[0] == "$")
                             throw new Error(attr + " attribute name is not valid");
                         attr = attr.toLowerCase();
@@ -1400,7 +1422,7 @@ var wolf = (() => {
                     }
                     wdef.$init && initiators.push(wdef.$init);
                 } else { // Normal element
-                    node.getAttributeNames().forEach(attr => {
+                    node.getAttributeNames().forEach(function (attr) {
                         if (attr[0] == "$")
                             throw new Error(attr + " attribute name is not valid");
                         attr = attr.toLowerCase();
@@ -1424,12 +1446,12 @@ var wolf = (() => {
                             if (aval instanceof D.Binding && !wattr.bindable)
                                 throw new Error(attr + " does not allow binding");
                             if (wattr.processor)
-                                templ[attrName] = element => wattr.processor(element, aval, templ);
+                                templ[attrName] = function (element) { wattr.processor(element, aval, templ); };
                             //TODO: do not like this solution, maily for wolf:repeat attribute because <wolf:repeat> element
                             //      get relocated then repeating tr or tds inside a table.
                             //      Better try to parse the HTML manually when reading templates to avoid node relocations
                             if (wattr.initTemplate)
-                                initiators.push(ttempl => wattr.initTemplate(ttempl, aval));
+                                initiators.push(function (ttempl) { return wattr.initTemplate(ttempl, aval); });
                         } else if (attr && attr.substr(0, 5) == "bind:") {
                             attr = attr.substr(5);
                             if (attr[0] == "$")
@@ -1454,7 +1476,7 @@ var wolf = (() => {
                         }
                     }
 
-                initiators.forEach(init => {
+                initiators.forEach(function (init) {
                     var ttempl = init(templ);
                     if (ttempl !== undefined)
                         templ = ttempl;
@@ -1474,7 +1496,7 @@ var wolf = (() => {
             var fragment = readTemplate(fragmentElement);
 
             if (fragment.$controller && typeof (fragment.$controller) === "string") {
-                K.require(fragment.$controller, (ctrl) => {
+                K.require(fragment.$controller, function (ctrl) {
                     fragment.$controller = ctrl;
                     callback && callback(fragment);
                 });
@@ -1491,7 +1513,7 @@ var wolf = (() => {
              * @callback fetchFragment_callback
              * @param {*} rootElement Loaded fragment DOM
              */
-            TOOLS.wGet(url, html => {
+            TOOLS.wGet(url, function (html) {
                 var rootElement = document.createElement("wolf:fragment");
                 rootElement.innerHTML = html;
                 if (rootElement.children.length == 1 && rootElement.children[0].tagName == "WOLF:FRAGMENT")
@@ -1516,8 +1538,8 @@ var wolf = (() => {
                     throw new Error("named fragment '" + url + "' not loaded");
                 var cbl = frgs[url] = new K.CallbackList(); //temporal CBL
                 cbl.add(callback);
-                fetchFragment(url, rootElement => {
-                    processFragmentTemplate(rootElement, (fragment) => {
+                fetchFragment(url, function (rootElement) {
+                    processFragmentTemplate(rootElement, function (fragment) {
                         cbl.fire([frgs[url] = fragment]);
                     });
                 });
@@ -1541,7 +1563,7 @@ var wolf = (() => {
              * @param {*} fragment Loaded fragment template
              * @param {element} element Element to insert fragment
              */
-            loadFragment(url, (fragment) => {
+            loadFragment(url, function (fragment) {
                 fragment.$insertTo(element);
                 callback && callback(fragment, element);
             });
@@ -1572,12 +1594,12 @@ var wolf = (() => {
                 var filePath = new URL(url, document.baseURI).pathname;
                 var dp = filePath.lastIndexOf(".");
                 if (dp < 0) {
-                    console && console.error(`Can not detect resource type by url '${url}'. Aborting!`);
+                    console && console.error("Can not detect resource type by url '" + url + "'. Aborting!");
                     return;
                 }
                 type = filePath.substr(dp + 1);
                 if (!type) {
-                    console && console.error(`Can not detect resource type by url '${url}'. Aborting!`);
+                    console && console.error("Can not detect resource type by url '" + url + "'. Aborting!");
                     return;
                 }
             }
@@ -1591,6 +1613,7 @@ var wolf = (() => {
                     break;
                 case "js":
                     var escript = document.createElement("script");
+                    escript.type = "text/javascript";
                     escript.src = url;
                     document.head.appendChild(escript);
                     break;
@@ -1608,7 +1631,7 @@ var wolf = (() => {
 
             if (!navigatorController) {
                 //Create navigation controller object
-                navigatorController = (() => {
+                navigatorController = (function () {
                     var navs = [];
 
                     function registerNavigator(element, navigator) {
@@ -1624,7 +1647,7 @@ var wolf = (() => {
                         }
                     }
 
-                    window.addEventListener("hashchange", () => {
+                    window.addEventListener("hashchange", function () {
                         processHash(document.location.hash);
                     }, false);
 
@@ -1645,14 +1668,14 @@ var wolf = (() => {
             function doNav(id, data) {
                 var navEntry = navigationMap[id];
                 if (!navEntry)
-                    throw new Error(`Navigation "${id}" not defined.`)
+                    throw new Error("Navigation '" + id + "' not defined.");
                 current = { id: id, data: data };
-                var lh = new K.LoadHandler(() => {
+                var lh = new K.LoadHandler(function () {
                     if (navEntry.event)
                         callEvent(lh.__elem, navEntry.event);
                     for (var i in nav.onChange) try {
                         nav.onChange[i](id, data);
-                    } catch { };
+                    } catch (e) { };
                 });
 
                 function callEvent(element, eventName) {
@@ -1670,7 +1693,7 @@ var wolf = (() => {
 
                 function navFragment(dest, elem) {
                     lh.enter();
-                    loadFragmentTo(dest.to, elem, (templ, setElem) => {
+                    loadFragmentTo(dest.to, elem, function (templ, setElem) {
                         lh.__elem = lh.__elem || setElem;
                         if (dest.then)
                             processSet(dest.then);
@@ -1707,12 +1730,12 @@ var wolf = (() => {
             function navTo(id, data) {
                 var navEntry = navigationMap[id];
                 if (!navEntry)
-                    throw new Error(`Navigation "${id}" not defined.`)
+                    throw new Error("Navigation '" + id + "' not defined.");
 
                 var pattern = "";
                 data = data || {};
                 if (navEntry.pattern)
-                    navEntry.pattern.forEach(part => {
+                    navEntry.pattern.forEach(function (part) {
                         var patternPart = part.isData ? data[part.name] : part.name;
                         pattern += "/" + (patternPart || "");
                     });
@@ -1741,7 +1764,7 @@ var wolf = (() => {
                         var newCa = [];
                         var newCaVar = [];
                         var exact = false;
-                        candidates.forEach(k => {
+                        candidates.forEach(function (k) {
                             if (!k)
                                 return; //Kill nulls
                             var nav = navigationMap[k];
@@ -1843,10 +1866,10 @@ var wolf = (() => {
             }
 
             if (typeof navigationMap === 'string') {
-                TOOLS.loadJSON(navigationMap, data => {
+                TOOLS.loadJSON(navigationMap, function (data) {
                     navigationMap = data;
                     initNavigation();
-                }, e => {
+                }, function (e) {
                     if (typeof navigationMap === 'string')
                         throw new Error("Can't load the navigation map at: " + navigationMap + "\n(" + e + ")");
                     else
@@ -1929,7 +1952,7 @@ var wolf = (() => {
     })();
 
     // ==== TOOLS ==== collection of utility functions
-    var TOOLS = (() => {
+    var TOOLS = (function () {
 
         /**
          * Process a fetch operation under the wolf standards
@@ -1973,15 +1996,15 @@ var wolf = (() => {
             }
             fetch(url, {
                 credentials: "same-origin"
-            }).then(r => {
+            }).then(function (r) {
                 if (r.ok) {
                     r[type]()
-                        .then(data => callback(data))
-                        .catch(e => fail(e, "process"));
+                        .then(function (data) { callback(data); })
+                        .catch(function (e) { fail(e, "process") });
                 } else {
                     fail({ status: r.status, text: r.statusText }, "http")
                 }
-            }).catch(e => fail(e, "net"));
+            }).catch(function (e) { fail(e, "net") });
         }
 
         /**
@@ -2070,15 +2093,15 @@ var wolf = (() => {
                         cb && cb(code);
                 }
                 if (langTree[0] == empty)
-                    loadJSON(path + ".json", l => set(0, l), () => set(0));
+                    loadJSON(path + ".json", function (l) { set(0, l) }, function () { set(0) });
                 if (lang.lang)
-                    loadJSON(path + `-${lang.lang}.json`, l => set(1, l), () => set(1));
+                    loadJSON(path + "-" + lang.lang + ".json", function (l) { set(1, l) }, function () { set(1) });
                 else
-                    langTree[1] = {};
+                    langTree[1] = langdone[1] = {};
                 if (lang.country)
-                    loadJSON(path + `-${lang.lang}-${lang.country}.json`, l => set(2, l), () => set(2));
+                    loadJSON(path + "-" + lang.lang + "-" + lang.country + ".json", function (l) { set(2, l) }, function () { set(2) });
                 else
-                    langTree[2] = {};
+                    langTree[2] = langdone[2] = {};
             }
 
             /**
@@ -2095,7 +2118,7 @@ var wolf = (() => {
              */
             function stringTemplateParser(expression, valueObj) {
                 const templateMatcher = /{\s?([^{}\s]*)\s?}/g;
-                let text = expression.replace(templateMatcher, (substring, value, index) => {
+                let text = expression.replace(templateMatcher, function (substring, value, index) {
                     value = valueObj[value];
                     if (!value)
                         value = "";
@@ -2145,6 +2168,13 @@ var wolf = (() => {
     function wolfExtension(extender) {
         extender(K, D, UI, TOOLS);
     }
+
+    /**
+     * Init framework
+     */
+    (function () {
+        checkPolyFills();
+    })();
 
     return {
         // Kernel

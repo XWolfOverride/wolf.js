@@ -19,9 +19,9 @@
  *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-(() => {
+(function () {
     'use strict';
-    wolf.wolfExtension((K, D, UI, TOOLS) => {
+    wolf.wolfExtension(function (K, D, UI, TOOLS) {
 
         /**
          * Common dialog controller
@@ -69,9 +69,9 @@
                 else {
                     if (!Array.isArray(ui))
                         ui = [ui];
-                    ui.forEach(uielem => {
+                    ui.forEach(function (uielem) {
                         var uiDOM = UI.instanceTemplate(uielem, { parent: body });
-                        uiDOM.forEach(dom => body.appendChild(dom));
+                        uiDOM.forEach(function (dom) { body.appendChild(dom) });
                     })
                 }
             }
@@ -89,10 +89,10 @@
                 }
                 if (!Array.isArray(buttonsDef))
                     buttonsDef = [buttonsDef];
-                buttonsDef.forEach(uidef => {
+                buttonsDef.forEach(function (uidef) {
                     if (uidef.type || uidef.value) {
                         var uiDOM = UI.instanceTemplate(uidef);
-                        uiDOM.forEach(dom => buttons.appendChild(dom));
+                        uiDOM.forEach(function (dom) { buttons.appendChild(dom) });
                     } else
                         for (var k in uidef) {
                             var def = uidef[k];
@@ -119,14 +119,14 @@
                             buttons.appendChild(button);
                         }
                     function installEvent(button, id, def) {
-                        button.addEventListener("click", (evt) => {
+                        button.addEventListener("click", function (evt) {
                             var evtMethod;
                             if (controller)
                                 evtMethod = controller[id];
                             if (!evtMethod)
                                 evtMethod = def.click;
                             if (!evtMethod)
-                                evtMethod = () => {
+                                evtMethod = function () {
                                     dialog.dialogController.result = id;
                                     dialog.close();
                                 }
@@ -169,9 +169,9 @@
             div.className = "wolf-toast wolf-toast-" + type;
             div.innerText = text;
             document.body.appendChild(div);
-            setTimeout(() => {
+            setTimeout(function () {
                 div.style.opacity = 0;
-                setTimeout(() => {
+                setTimeout(function () {
                     document.body.removeChild(div);
                 }, 1000);
             }, 1500);
@@ -190,7 +190,7 @@
         function dialog(element, modal, url, buttons, controller, callback, onclose) {
             var dc = dialogControl(modal, element, controller);
 
-            UI.loadFragment(url, (fragment) => {
+            UI.loadFragment(url, function (fragment) {
                 dc.append(fragment);
                 if (buttons)
                     dc.appendButtons(buttons);
@@ -237,9 +237,8 @@
          * @param {string} path Path of the UI library to load
          */
         function loadLibrary(path) {
-            UI.fetchFragment(path, dom => {
+            UI.fetchFragment(path, function (dom) {
                 UI.readTemplate(dom, null, {
-
                 });
             });
         }
@@ -304,7 +303,7 @@
                     var ctrl = ext.parentCustom || element.getController(); //TODO: This hide the controller if there is a custom
                     var evtMethod = ctrl[method];
                     if (!evtMethod)
-                        throw new Error(`Method '${method}' not found for event '${ename}'.`);
+                        throw new Error("Method '" + method + "' not found for event '" + ename + "'.");
                     evtMethod(element, event);
                 }
             }
@@ -327,7 +326,7 @@
                         return null;
                     }
                     // Read definition
-                    template.$.forEach(c => {
+                    template.$.forEach(function (c) {
                         switch (c.$t) {
                             case null:
                                 break;
@@ -371,11 +370,11 @@
                                 var script = c.$[0].$;
                                 if (script && (typeof script != "string" || script.indexOf("use strict") < 1))
                                     throw new Error("Control definition wolf:" + id + " script 'use strict'; mandatory");
-                                scriptFactory = new Function('control', 'K', 'D', 'UI', 'TOOLS', `${script};\n//# sourceURL=wolf:${id}`);
+                                scriptFactory = new Function('control', 'K', 'D', 'UI', 'TOOLS', script + ";\n//# sourceURL=wolf:" + id);
                                 break;
                             }
                             default:
-                                throw new Error("Control definition wolf:" + id + " " + c.type + " not allowed here.");
+                                throw new Error("Control definition wolf:" + id + " " + c.$t + " not allowed here.");
                         }
                     });
 
@@ -392,23 +391,23 @@
 
                         var values = getControlAttributesTable(controller, template);
                         var API = {
-                            ui: (name, clone) => {
+                            ui: function (name, clone) {
                                 var result = name ? ui[name] : ui[""];
                                 return clone !== false ? UI.cloneTemplate(result) : result;
                             },
-                            value: name => {
+                            value: function (name) {
                                 var data = values[name];
                                 if (data instanceof D.Binding)
                                     data = data.getValue(ext.parent);
                                 return data;
                             },
-                            binding: name => {
+                            binding: function (name) {
                                 var data = values[name];
                                 if (data instanceof D.Binding)
                                     return data;
                                 return null;
                             },
-                            childs: name => {
+                            childs: function (name) {
                                 //ID for usage on future with multiple chilnodes block definitions
                                 return template.$;
                             },
@@ -417,9 +416,9 @@
                         }
                         var script = scriptFactory ? new scriptFactory(API, K, D, UI, TOOLS) : {};
                         API.controller = script;
-                        API.instanceTemplate = (templ, ext2) => UI.instanceTemplate(templ, ext2 ? ext2 : { parent: API.parent, customController: script })
+                        API.instanceTemplate = function (templ, ext2) { UI.instanceTemplate(templ, ext2 ? ext2 : { parent: API.parent, customController: script }) };
                         if (!script.build)
-                            script.build = () => {
+                            script.build = function () {
                                 return ui[""];
                             }
 
@@ -462,7 +461,7 @@
                                     data.bindExecutor(element,
                                         null,
                                         null,
-                                        read => element.nodeValue = read({ element: element })
+                                        function (read) { element.nodeValue = read({ element: element }) }
                                     );
                                 else
                                     element.nodeValue = data;
@@ -477,7 +476,7 @@
                                         data.bindExecutor(element,
                                             null,
                                             null,
-                                            read => element.setAttribute(k, read({ element: element }))
+                                            function (read) { element.setAttribute(k, read({ element: element })) }
                                         );
                                     else
                                         element.setAttribute(k, data);
