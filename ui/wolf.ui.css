@@ -48,6 +48,7 @@
     overflow: hidden;
     max-height: 95%;
     max-width: 95%;
+    display:flex;
 }
 
 .wolf-dialog-message-text {

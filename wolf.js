@@ -29,13 +29,13 @@ var wolf = (function () {
     // ==== PolyFills (IE 11 support) ====
     function checkPolyFills() {
         if (typeof window["URL"] !== 'function')
-            UI.import("https://cdn.polyfill.io/v2/polyfill.min.js","js");
+            UI.import("https://cdn.polyfill.io/v2/polyfill.min.js", "js");
 
         if (typeof window["Promise"] !== 'function')
-            UI.import("https://cdn.jsdelivr.net/npm/promise-polyfill@8.1.3/dist/polyfill.min.js","js");
+            UI.import("https://cdn.jsdelivr.net/npm/promise-polyfill@8.1.3/dist/polyfill.min.js", "js");
 
         if (typeof window["fetch"] !== 'function')
-            UI.import("https://cdn.jsdelivr.net/npm/whatwg-fetch@3.4.0/dist/fetch.umd.min.js","js");
+            UI.import("https://cdn.jsdelivr.net/npm/whatwg-fetch@3.4.0/dist/fetch.umd.min.js", "js");
 
         if (!Element.prototype.getAttributeNames) {
             Element.prototype.getAttributeNames = function () {
@@ -144,6 +144,7 @@ var wolf = (function () {
                     try {
                         var inc = Function("'use strict';return " + data + ";\n//# sourceURL=" + url);
                     } catch (e) {
+                        console.error("Error in module '" + url + "' parsing file: " + e.message, e);
                         throw new Error("Error in module '" + url + "' parsing file: " + e.message);
                     }
                     instantiate(inc(), function (lobj) {
